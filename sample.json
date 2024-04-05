@@ -1,0 +1,30 @@
+{
+    "title": "Maintenance Report",
+    "description": "Report for electrical and plumbing work.",
+    "fields": [
+        {
+            "name": "email",
+            "field_type": "email",
+            "label": "Email Address",
+            "required": true
+        },
+        {
+            "name": "job_status",
+            "field_type": "select",
+            "label": "Job Status",
+            "options": ["completed", "pending"],
+            "required": true  // Include this if you want to explicitly specify it's not required
+        },
+        {
+            "name": "description",
+            "field_type": "text",
+            "label": "Description of work",
+            "required": false
+        }
+    ],
+    "data": {
+        "email": "test@email.com",
+        "job_status": "completed",
+        "description": "Mechanical motor and electrical switch failure."
+    }
+}
