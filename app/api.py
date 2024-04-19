@@ -14,8 +14,7 @@ app = FastAPI()
 MONGODB_URL = "mongodb+srv://andreasebastio014:testpass@cluster0.jqaqs3v.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
 client = motor.motor_asyncio.AsyncIOMotorClient(MONGODB_URL)
 db = client.Forms
-clean_forms = db.get_collection("Clean Forms")
-filled_forms = db.get_collection("Clean Forms")
+form_samples = db.get_collection("Samples")
 
 origins = [
     "http://localhost:3000",
@@ -49,6 +48,7 @@ class FormModel(BaseModel):
     description: str
     organization: str
     template: bool
+    status: bool
     fields: List[FormField]
     data: Dict[str, Any]  # Holds the dynamic values for each field named by 'name' in FormFields
 
@@ -77,13 +77,18 @@ async def read_root() -> dict:
     response_model=FormsCollection,
     response_model_by_alias=False,
 )
-async def list_forms(organization: str, email: str):
+async def list_forms(organization: str, email: str, status: str):
     """
     List all of the data in the database that match the given organization and email.
     The response is unpaginated and limited to 1000 results.
     """
-    query = {"organization": organization, "data.email": email}
-    forms = await clean_forms.find(query).to_list(1000)
+
+    # Convert the status string to a boolean value
+    status_bool = status.lower() == 'true'
+    
+    # query sets the conditions which it searches for in the forms collection
+    query = {"organization": organization, "data.email": email, "status": status_bool}
+    forms = await form_samples.find(query).to_list(1000)
     print(f"{email}'s Assigned Forms: {forms}")  # Add this line
     return FormsCollection(forms=forms)
 
@@ -93,20 +98,39 @@ async def submit_form(form: FormModel = Body(...)):
     print('Received Form Data:', form)  # Add this line
     try:
         form_dict = form.model_dump(by_alias=True)  # Convert to dict, respecting field aliases if any
-        insert_result = await clean_forms.insert_one(form_dict)
+        insert_result = await form_samples.insert_one(form_dict)
         return {"message": "Form data submitted successfully", "id": str(insert_result.inserted_id)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# POST endpoint to accept and store filled out forms from the Your Forms page
-@app.post("/submit-form/")
-async def submit_form(form: FormModel = Body(...)):
-    print('Received Form Data:', form)  # Add this line
+# # POST endpoint to accept and store filled out forms from the Your Forms page
+# @app.post("/submit-form/")
+# async def submit_form(form: FormModel = Body(...)):
+#     print('Received Form Data:', form)  # Add this line
+#     try:
+#         form_dict = form.model_dump(by_alias=True)  # Convert to dict, respecting field aliases if any
+#         insert_result = await form_samples.insert_one(form_dict)
+#         return {"message": "Form data submitted successfully", "id": str(insert_result.inserted_id)}
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
+
+
+# PUT endpoint to update the form data
+@app.put("/submit-form/{form_id}")
+async def update_form(form_id: str, form: FormModel = Body(...)):
+    print('Received Form Data:', form)
     try:
-        form_dict = form.model_dump(by_alias=True)  # Convert to dict, respecting field aliases if any
-        insert_result = await filled_forms.insert_one(form_dict)
-        return {"message": "Form data submitted successfully", "id": str(insert_result.inserted_id)}
+        # Convert the form data to a dictionary
+        form_dict = form.model_dump(by_alias=True)
+        
+        # Update the form data in the database
+        update_result = await form_samples.update_one({"_id": ObjectId(form_id)}, {"$set": form_dict})
+        
+        if update_result.modified_count == 1:
+            return {"message": "Form data updated successfully"}
+        else:
+            raise HTTPException(status_code=404, detail="Form not found")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
