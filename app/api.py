@@ -8,14 +8,14 @@ from bson import ObjectId
 import motor.motor_asyncio
 from pymongo import ReturnDocument
 
-
 app = FastAPI()
 
+# MongoDB Database and Collections Declaration
 MONGODB_URL = "mongodb+srv://andreasebastio014:testpass@cluster0.jqaqs3v.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
-
 client = motor.motor_asyncio.AsyncIOMotorClient(MONGODB_URL)
 db = client.Forms
-form_samples = db.get_collection("Samples")
+clean_forms = db.get_collection("Clean Forms")
+filled_forms = db.get_collection("Clean Forms")
 
 origins = [
     "http://localhost:3000",
@@ -38,7 +38,7 @@ class FormField(BaseModel):
 
     @validator('field_type')
     def validate_field_type(cls, v):
-        allowed_types = ["text", "number", "email", "date", "signature", "select", "checkbox", "radio"]
+        allowed_types = ["text", "number", "email", "date", "signature", "select", "checkbox", "radio", "dropdown","description"]
         if v not in allowed_types:
             raise ValueError(f"field_type must be one of {allowed_types}")
         return v
@@ -46,18 +46,17 @@ class FormField(BaseModel):
 # FormModel now contains a list of FormFields and a dictionary for the form data
 class FormModel(BaseModel):
     title: str
-    description: str = ""
+    description: str
+    organization: str
+    template: bool
     fields: List[FormField]
     data: Dict[str, Any]  # Holds the dynamic values for each field named by 'name' in FormFields
-
 
 class FormsCollection(BaseModel):
     """
     A container holding a list of `StudentModel` instances.
-
     This exists because providing a top-level array in a JSON response can be a [vulnerability](https://haacked.com/archive/2009/06/25/json-hijacking.aspx/)
     """
-
     forms: List[FormModel]
 
 app.add_middleware(
@@ -67,7 +66,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"]
 )
-
 
 @app.get("/", tags=["root"])
 async def read_root() -> dict:
@@ -79,26 +77,39 @@ async def read_root() -> dict:
     response_model=FormsCollection,
     response_model_by_alias=False,
 )
-async def list_forms():
+async def list_forms(organization: str, email: str):
     """
-    List all of the student data in the database.
-
+    List all of the data in the database that match the given organization and email.
     The response is unpaginated and limited to 1000 results.
     """
-    temp = FormsCollection(forms=await form_samples.find().to_list(1000))
-    print(temp)
-    return FormsCollection(forms=await form_samples.find().to_list(1000))
+    query = {"organization": organization, "data.email": email}
+    forms = await clean_forms.find(query).to_list(1000)
+    print(f"{email}'s Assigned Forms: {forms}")  # Add this line
+    return FormsCollection(forms=forms)
 
-
-# POST endpoint to accept and store form data
-@app.post("/submit-form/")
+# POST endpoint to accept and store cleans forms created by an Document Manager
+@app.post("/create-form/")
 async def submit_form(form: FormModel = Body(...)):
+    print('Received Form Data:', form)  # Add this line
     try:
         form_dict = form.model_dump(by_alias=True)  # Convert to dict, respecting field aliases if any
-        insert_result = await form_samples.insert_one(form_dict)
+        insert_result = await clean_forms.insert_one(form_dict)
         return {"message": "Form data submitted successfully", "id": str(insert_result.inserted_id)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# POST endpoint to accept and store filled out forms from the Your Forms page
+@app.post("/submit-form/")
+async def submit_form(form: FormModel = Body(...)):
+    print('Received Form Data:', form)  # Add this line
+    try:
+        form_dict = form.model_dump(by_alias=True)  # Convert to dict, respecting field aliases if any
+        insert_result = await filled_forms.insert_one(form_dict)
+        return {"message": "Form data submitted successfully", "id": str(insert_result.inserted_id)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # # # # # # # # # # # # Obsolete Code # # # # # # # # # # # # # # # # # # # # # # # # # #
