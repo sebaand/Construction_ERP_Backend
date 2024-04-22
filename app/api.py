@@ -21,6 +21,17 @@ origins = [
     "localhost:3000"
 ]
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"]
+)
+
+# Create a dictionary to store the ObjectId along with their respective _id values
+form_data_with_ids = {}
+
 # FormField now only holds metadata about each form field
 class FormField(BaseModel):
     name: str  # Unique identifier for the field, used as the key in the form data
@@ -42,8 +53,19 @@ class FormField(BaseModel):
             raise ValueError(f"field_type must be one of {allowed_types}")
         return v
 
-# FormModel now contains a list of FormFields and a dictionary for the form data
-class FormModel(BaseModel):
+# # FormModel now contains a list of FormFields and a dictionary for the form data
+class CreateFormModel(BaseModel):
+    title: str
+    description: str
+    organization: str
+    template: bool
+    status: bool
+    fields: List[FormField]
+    data: Dict[str, Any]  # Holds the dynamic values for each field named by 'name' in FormFields
+
+# # FormModel now contains a list of FormFields and a dictionary for the form data
+class SubmitFormModel(BaseModel):
+    index: int
     title: str
     description: str
     organization: str
@@ -53,19 +75,7 @@ class FormModel(BaseModel):
     data: Dict[str, Any]  # Holds the dynamic values for each field named by 'name' in FormFields
 
 class FormsCollection(BaseModel):
-    """
-    A container holding a list of `StudentModel` instances.
-    This exists because providing a top-level array in a JSON response can be a [vulnerability](https://haacked.com/archive/2009/06/25/json-hijacking.aspx/)
-    """
-    forms: List[FormModel]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"]
-)
+    forms: List[SubmitFormModel]
 
 @app.get("/", tags=["root"])
 async def read_root() -> dict:
@@ -85,16 +95,25 @@ async def list_forms(organization: str, email: str, status: str):
 
     # Convert the status string to a boolean value
     status_bool = status.lower() == 'true'
-    
-    # query sets the conditions which it searches for in the forms collection
+
+     # query sets the conditions which it searches for in the forms collection
     query = {"organization": organization, "data.email": email, "status": status_bool}
     forms = await form_samples.find(query).to_list(1000)
-    print(f"{email}'s Assigned Forms: {forms}")  # Add this line
+
+    # Iterate over each form and store its _id in the dictionary
+    for i,form in enumerate(forms):
+        form_id = str(form["_id"])
+        form_data_with_ids[form_id] = i
+        form["index"] = i  # Add the index to the form data
+    print(forms)
+   
+    # print(f"{email}'s Assigned Forms: {forms}")  # Add this line
+    # print(f"post formatting: {FormsCollection(forms=forms)}")  # Add this line
     return FormsCollection(forms=forms)
 
 # POST endpoint to accept and store cleans forms created by an Document Manager
 @app.post("/create-form/")
-async def submit_form(form: FormModel = Body(...)):
+async def submit_form(form: CreateFormModel = Body(...)):
     print('Received Form Data:', form)  # Add this line
     try:
         form_dict = form.model_dump(by_alias=True)  # Convert to dict, respecting field aliases if any
@@ -117,10 +136,13 @@ async def submit_form(form: FormModel = Body(...)):
 
 
 # PUT endpoint to update the form data
-@app.put("/submit-form/{form_id}")
-async def update_form(form_id: str, form: FormModel = Body(...)):
+@app.put("/submit-form/{form_index}")
+async def update_form(form_index: int, form: SubmitFormModel = Body(...)):
     print('Received Form Data:', form)
     try:
+        # Retrieve the ObjectId using the form index from the form_data_with_ids dictionary
+        form_id = list(form_data_with_ids.keys())[form_index]
+        
         # Convert the form data to a dictionary
         form_dict = form.model_dump(by_alias=True)
         
