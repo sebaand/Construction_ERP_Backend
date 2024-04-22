@@ -29,9 +29,6 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-# Create a dictionary to store the ObjectId along with their respective _id values
-form_data_with_ids = {}
-
 # FormField now only holds metadata about each form field
 class FormField(BaseModel):
     name: str  # Unique identifier for the field, used as the key in the form data
@@ -65,7 +62,7 @@ class CreateFormModel(BaseModel):
 
 # # FormModel now contains a list of FormFields and a dictionary for the form data
 class SubmitFormModel(BaseModel):
-    index: int
+    id: str
     title: str
     description: str
     organization: str
@@ -103,12 +100,8 @@ async def list_forms(organization: str, email: str, status: str):
     # Iterate over each form and store its _id in the dictionary
     for i,form in enumerate(forms):
         form_id = str(form["_id"])
-        form_data_with_ids[form_id] = i
-        form["index"] = i  # Add the index to the form data
-    print(forms)
-   
-    # print(f"{email}'s Assigned Forms: {forms}")  # Add this line
-    # print(f"post formatting: {FormsCollection(forms=forms)}")  # Add this line
+        form["id"] =  form_id # Add the index to the form data
+
     return FormsCollection(forms=forms)
 
 # POST endpoint to accept and store cleans forms created by an Document Manager
@@ -123,26 +116,12 @@ async def submit_form(form: CreateFormModel = Body(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# # POST endpoint to accept and store filled out forms from the Your Forms page
-# @app.post("/submit-form/")
-# async def submit_form(form: FormModel = Body(...)):
-#     print('Received Form Data:', form)  # Add this line
-#     try:
-#         form_dict = form.model_dump(by_alias=True)  # Convert to dict, respecting field aliases if any
-#         insert_result = await form_samples.insert_one(form_dict)
-#         return {"message": "Form data submitted successfully", "id": str(insert_result.inserted_id)}
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=str(e))
-
-
 # PUT endpoint to update the form data
-@app.put("/submit-form/{form_index}")
-async def update_form(form_index: int, form: SubmitFormModel = Body(...)):
-    print('Received Form Data:', form)
+@app.put("/submit-form/{form_id}")
+async def update_form(form_id: str, form: SubmitFormModel = Body(...)):
+    # print('Received Form Data:', form)
+    print('form_id', form_id)
     try:
-        # Retrieve the ObjectId using the form index from the form_data_with_ids dictionary
-        form_id = list(form_data_with_ids.keys())[form_index]
-        
         # Convert the form data to a dictionary
         form_dict = form.model_dump(by_alias=True)
         
@@ -155,52 +134,3 @@ async def update_form(form_index: int, form: SubmitFormModel = Body(...)):
             raise HTTPException(status_code=404, detail="Form not found")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-# # # # # # # # # # # # Obsolete Code # # # # # # # # # # # # # # # # # # # # # # # # # #
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-
-# # # If the Form is pre-defined an approach like this works:
-# class FormField(BaseModel):
-#     type: str  # The type of the field (text, number, date, checkbox, signature, etc.)
-#     label: str  # Human-readable label for the field
-#     value: Optional[Union[str, int, List[str], datetime]] = None  # The value of the field
-#     required: bool = False  # Whether the field is required
-
-# class FormModel(BaseModel):
-#     id: str  # Unique identifier for the form
-#     name: Optional[str] = None
-#     date: Optional[datetime] = None
-#     email: Optional[EmailStr] = None
-#     address: Optional[str] = None
-#     job_status: Optional[str] = None  # Could also be an Enum if you have predefined statuses
-#     trades: Optional[List[str]] = Field(default=None, example=["electrical", "plumbing"])
-#     column1: Optional[str] = None  # Custom text field
-#     column2: Optional[str] = None  # Custom text field
-#     column3: Optional[str] = None  # Custom text field (or number if these are always numeric)
-#     column4: Optional[str] = None  # Custom text field
-#     column5: Optional[str] = None  # Custom text field (or number if these are always numeric)
-#     signature: Optional[str] = None  # Base64 encoded image or some string representation
-#     # ... other form fields as required
-
-#     class Config:
-#         schema_extra = {
-#             "example": {
-#                 "id": "1",
-#                 "name": "",
-#                 "date": "2024-03-11T00:00:00",
-#                 "email": "test@email.com",
-#                 "address": "Test Avenue 100, UK, M201DX",
-#                 "job_status": "completed",
-#                 "trades": ["electrical", "plumbing"],
-#                 "column1": "Mechanical motor and electrical switch failure. Substituting broken pieces.",
-#                 "column2": "RAMS must be sent to owner",
-#                 "column3": "3",
-#                 "signature": "Bobby Lee"
-#             }
-#         }
-
-# @app.get("/FormData", tags=["formdata"])
-# async def get_formdata() -> dict:
-#     return { "data": formdata }
