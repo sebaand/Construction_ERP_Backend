@@ -11,7 +11,7 @@ from pymongo import ReturnDocument
 app = FastAPI()
 
 # MongoDB Database and Collections Declaration
-MONGODB_URL = "mongodb+srv://andreasebastio014:testpass@cluster0.jqaqs3v.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+MONGODB_URL = "mongodb+srv://andreasebastio014:{os.getenv('MONGO_DB_PASSWORD')}@cluster0.jqaqs3v.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
 client = motor.motor_asyncio.AsyncIOMotorClient(MONGODB_URL)
 db = client.Forms
 form_samples = db.get_collection("Samples")
