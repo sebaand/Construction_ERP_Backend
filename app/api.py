@@ -25,7 +25,8 @@ origins = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=['https://polyglotplus.com', 'https://www.polyglotplus.com'],
+    # allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]
@@ -47,7 +48,7 @@ class FormField(BaseModel):
 
     @validator('field_type')
     def validate_field_type(cls, v):
-        allowed_types = ["text", "number", "email", "date", "signature", "select", "checkbox", "radio", "dropdown","description", "section_break"]
+        allowed_types = ["text", "number", "decimal", "email", "date", "signature", "select", "checkbox", "radio", "dropdown","description", "section_break"]
         if v not in allowed_types:
             raise ValueError(f"field_type must be one of {allowed_types}")
         return v
