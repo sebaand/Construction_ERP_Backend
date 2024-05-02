@@ -13,7 +13,6 @@ app = FastAPI()
 
 # MongoDB Database and Collections Declaration
 MONGODB_URL = f"mongodb+srv://andreasebastio014:{os.getenv('MONGO_DB_PASSWORD')}@cluster0.jqaqs3v.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
-# MONGODB_URL = "mongodb+srv://andreasebastio014:testpass@cluster0.jqaqs3v.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
 client = motor.motor_asyncio.AsyncIOMotorClient(MONGODB_URL)
 db = client.Forms
 form_samples = db.get_collection("Samples")
@@ -25,12 +24,25 @@ origins = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=['https://polyglotplus.com', 'https://www.polyglotplus.com'],
-    # allow_origins=origins,
+    # allow_origins=['https://polyglotplus.com', 'https://www.polyglotplus.com'],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]
 )
+
+class TableColumn(BaseModel):
+    name: str  # Unique identifier for the column
+    label: str  # Display label for the column
+    dataType: str  # Data type of the column (e.g., 'text', 'number', 'date', etc.)
+    required: Optional[bool] = False
+
+    @validator('dataType')
+    def validate_data_type(cls, v):
+        allowed_types = ["text", "number", "decimal", "date", "signature", "colour"]
+        if v not in allowed_types:
+            raise ValueError(f"dataType must be one of {allowed_types}")
+        return v
 
 # FormField now only holds metadata about each form field
 class FormField(BaseModel):
@@ -44,11 +56,11 @@ class FormField(BaseModel):
     max_length: Optional[int] = None  # Maximum length for text fields
     min_value: Optional[Union[int, float]] = None  # Min value for number fields
     max_value: Optional[Union[int, float]] = None  # Max value for number fields
-    # ...additional field attributes based on type
+    columns: Optional[List[TableColumn]] = None  # List of columns for table fields
 
     @validator('field_type')
     def validate_field_type(cls, v):
-        allowed_types = ["text", "number", "decimal", "email", "date", "signature", "select", "checkbox", "radio", "dropdown","description", "section_break"]
+        allowed_types = ["text", "number", "decimal", "email", "date", "signature","table","table-column","select", "checkbox", "radio", "dropdown","description", "section_break"]
         if v not in allowed_types:
             raise ValueError(f"field_type must be one of {allowed_types}")
         return v
@@ -95,7 +107,7 @@ async def list_forms(organization: str, email: str, status: str):
 
     # Convert the status string to a boolean value
     status_bool = status.lower() == 'true'
-
+    
      # query sets the conditions which it searches for in the forms collection
     query = {"organization": organization, "data.email": email, "status": status_bool}
     forms = await form_samples.find(query).to_list(1000)
@@ -109,7 +121,8 @@ async def list_forms(organization: str, email: str, status: str):
 
 # POST endpoint to accept and store cleans forms created by an Document Manager
 @app.post("/create-form/")
-async def submit_form(form: CreateFormModel = Body(...)):
+# async def submit_form(form: CreateFormModel = Body(...)): # FastAPI will automatically parse the JSON request body &- create an instance of the CreateFormModel class
+async def submit_form(form: CreateFormModel = Body(...)): # FastAPI will automatically parse the JSON request body &- create an instance of the CreateFormModel class
     print('Received Form Data:', form)  # Add this line
     try:
         form_dict = form.model_dump(by_alias=True)  # Convert to dict, respecting field aliases if any
