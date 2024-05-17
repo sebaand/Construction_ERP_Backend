@@ -16,7 +16,13 @@ MONGODB_URL = f"mongodb+srv://andreasebastio014:{os.getenv('MONGO_DB_PASSWORD')}
 client = motor.motor_asyncio.AsyncIOMotorClient(MONGODB_URL)
 db = client.Forms
 form_samples = db.get_collection("Samples")
+users = db.get_collection("Users")
+assigned_slates = db.get_collection("Assigned_Slates")
+early_birds = db.get_collection("Early_Birds")
+templates = db.get_collection("Templates")
+projects = db.get_collection("Projects")
 
+# Origins for local deployment during development stage. 
 origins = [
     "http://localhost:3000",
     "localhost:3000"
@@ -31,6 +37,35 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
+# Class for defining the model of the key data on the users
+class Projects(BaseModel):
+    owner: str
+    address: str
+    currency: str
+    projectName: str
+    projectType: str  
+    projectLead: str
+
+
+# Class for defining the model of the key data on the users
+class PlatformUsers(BaseModel):
+    first_name: str
+    last_name: str 
+    organization: str
+    username: str  
+    auth0_id: str
+
+
+# Class for defining the model of the key data on an early_bird adoption
+class EarlyBird(BaseModel):
+    name: Optional[str]
+    email: str 
+    organization: Optional[str]
+    privacyNoticeAccepted: bool
+    receiveMarketingCommunication: bool
+
+
+# Class for defining the datamodel for the table columns
 class TableColumn(BaseModel):
     name: str  # Unique identifier for the column
     label: str  # Display label for the column
@@ -43,6 +78,7 @@ class TableColumn(BaseModel):
         if v not in allowed_types:
             raise ValueError(f"dataType must be one of {allowed_types}")
         return v
+
 
 # FormField now only holds metadata about each form field
 class FormField(BaseModel):
@@ -65,15 +101,17 @@ class FormField(BaseModel):
             raise ValueError(f"field_type must be one of {allowed_types}")
         return v
 
+
 # # FormModel now contains a list of FormFields and a dictionary for the form data
 class CreateFormModel(BaseModel):
     title: str
     description: str
-    organization: str
-    template: bool
+    owner: str
+    last_updated: datetime
     status: bool
     fields: List[FormField]
     data: Dict[str, Any]  # Holds the dynamic values for each field named by 'name' in FormFields
+
 
 # # FormModel now contains a list of FormFields and a dictionary for the form data
 class SubmitFormModel(BaseModel):
@@ -86,20 +124,48 @@ class SubmitFormModel(BaseModel):
     fields: List[FormField]
     data: Dict[str, Any]  # Holds the dynamic values for each field named by 'name' in FormFields
 
+
+class TemplateCollection(BaseModel):
+    forms: List[CreateFormModel]
+
+
+class ProjectsCollection(BaseModel):
+    user_projects: List[Projects]
+
+
 class FormsCollection(BaseModel):
     forms: List[SubmitFormModel]
 
+
 @app.get("/", tags=["root"])
 async def read_root() -> dict:
-    return {"message": "Welcome to your todo list."}
+    return {"message": "Welcome!."}
 
+
+# Route for geting for getting the logged in user's profile
+@app.get("/user-profile/{auth0_id}", response_model=Optional[PlatformUsers])
+async def get_user_profile(auth0_id: str):
+    try:
+        user = await users.find_one({"auth0_id": auth0_id})
+        print("User:", user)
+        if user:
+            return PlatformUsers(**user)
+        else:
+            print(f"User with auth0_id '{auth0_id}' not found")
+            return None
+    except Exception as e:
+        print(f"Error retrieving user profile: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
+    
+
+# Route for geting for getting the template form's
 @app.get(
     "/FormData/",
     response_description="List all Form Data",
-    response_model=FormsCollection,
+    response_model=TemplateCollection,
     response_model_by_alias=False,
 )
-async def list_forms(organization: str, email: str, status: str):
+async def list_forms(owner: str, status: str):
     """
     List all of the data in the database that match the given organization and email.
     The response is unpaginated and limited to 1000 results.
@@ -109,25 +175,59 @@ async def list_forms(organization: str, email: str, status: str):
     status_bool = status.lower() == 'true'
     
      # query sets the conditions which it searches for in the forms collection
-    query = {"organization": organization, "data.email": email, "status": status_bool}
-    forms = await form_samples.find(query).to_list(1000)
+    query = {"owner": owner, "status": status_bool}
+    forms = await templates.find(query).to_list(10000)
 
     # Iterate over each form and store its _id in the dictionary
     for i,form in enumerate(forms):
         form_id = str(form["_id"])
         form["id"] =  form_id # Add the index to the form data
 
-    return FormsCollection(forms=forms)
+    return TemplateCollection(forms=forms)
+
+
+# Route for geting for getting the user's projects
+@app.get(
+    "/Projects/",
+    response_description="List all Form Data",
+    response_model=ProjectsCollection,
+    response_model_by_alias=False,
+)
+async def list_forms(owner: str):
+    
+     # query sets the conditions which it searches for in the forms collection
+    query = {"owner": owner}
+    user_projects = await projects.find(query).to_list(10000)
+
+    # Iterate over each form and store its _id in the dictionary
+    for i,form in enumerate(user_projects):
+        form_id = str(form["_id"])
+        form["id"] =  form_id # Add the index to the form data
+
+    return ProjectsCollection(user_projects=user_projects)
+
 
 # POST endpoint to accept and store cleans forms created by an Document Manager
-@app.post("/create-form/")
+@app.post("/create-slate/")
 # async def submit_form(form: CreateFormModel = Body(...)): # FastAPI will automatically parse the JSON request body &- create an instance of the CreateFormModel class
 async def submit_form(form: CreateFormModel = Body(...)): # FastAPI will automatically parse the JSON request body &- create an instance of the CreateFormModel class
     print('Received Form Data:', form)  # Add this line
     try:
         form_dict = form.model_dump(by_alias=True)  # Convert to dict, respecting field aliases if any
-        insert_result = await form_samples.insert_one(form_dict)
+        insert_result = await templates.insert_one(form_dict)
         return {"message": "Form data submitted successfully", "id": str(insert_result.inserted_id)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# POST endpoint to accept and store cleans forms created by an Document Manager
+@app.post("/create-project/")
+async def create_project(project: Projects = Body(...)): # FastAPI will automatically parse the JSON request body &- create an instance of the CreateFormModel class
+    print('Received Form Data:', project)  # Add this line
+    try:
+        project_dict = project.model_dump(by_alias=True)  # Convert to dict, respecting field aliases if any
+        insert_result = await projects.insert_one(project_dict)
+        return {"message": "project created successfully", "id": str(insert_result.inserted_id)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -148,5 +248,58 @@ async def update_form(form_id: str, form: SubmitFormModel = Body(...)):
             return {"message": "Form data updated successfully"}
         else:
             raise HTTPException(status_code=404, detail="Form not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# # Route for adding an early bird request to the database
+# @app.put("/early-signon/")
+# async def update_user_profile(user_profile: EarlyBird = Body(...)):
+#     try:
+#         # Add the user to the early_bird database
+#         await early_birds.insert(user_profile)
+#         return {"message": "early bird request added to database"}
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
+    
+@app.put("/early-signon/")
+async def update_user_profile(user_profile: EarlyBird = Body(...)):
+    try:
+        # Add the user to the early_bird database
+        result = await early_birds.insert_one(user_profile.model_dump(by_alias=True))
+        return {"message": "Early bird request added to database"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error adding early bird request to database: {str(e)}")
+
+
+# Route for updating the user profile  
+@app.put("/user-profile/")
+async def update_user_profile(user_profile: PlatformUsers = Body(...)):
+    user = await users.find_one({"auth0_id": user_profile.auth0_id})
+    print("user: ", user)
+    print("user_profile: ", user_profile.first_name)
+    try:
+        # Find the user in the database by auth0_id
+        user = await users.find_one({"auth0_id": user_profile.auth0_id})
+        if user:
+            # Update the user's profile fields
+            user["first_name"] = user_profile.first_name
+            user["last_name"] = user_profile.last_name
+            user["organization"] = user_profile.organization
+            user["username"] = user_profile.username
+
+            # Update the user in the database
+            await users.replace_one({"auth0_id": user_profile.auth0_id}, user)
+            return {"message": "User profile updated successfully"}
+        else:
+            # Create a new user profile
+            new_user = {
+                "first_name": user_profile.first_name,
+                "last_name": user_profile.last_name,
+                "organization": user_profile.organization,
+                "username": user_profile.username,
+                "auth0_id": user_profile.auth0_id
+            }
+            await users.insert_one(new_user)
+            return {"message": "User profile created successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
