@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Body
+from fastapi import FastAPI, HTTPException, Body, Request, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, EmailStr, validator
 from typing import List, Optional, Union, Any, Dict
@@ -102,8 +102,8 @@ class FormField(BaseModel):
         return v
 
 
-# # FormModel now contains a list of FormFields and a dictionary for the form data
-class CreateFormModel(BaseModel):
+# # FormModel now contains a list of Slate Fields and a dictionary for the form data
+class CreateSlateModel(BaseModel):
     title: str
     description: str
     owner: str
@@ -113,33 +113,53 @@ class CreateFormModel(BaseModel):
     data: Dict[str, Any]  # Holds the dynamic values for each field named by 'name' in FormFields
 
 
-# # FormModel now contains a list of FormFields and a dictionary for the form data
-class SubmitFormModel(BaseModel):
+# # FormModel now contains a list of Slate Fields and a dictionary for the form data
+class AssignSlateModel(BaseModel):
+    title: str
+    project: str
+    description: str
+    due_date: datetime
+    owner: str
+    last_updated: datetime
+    status: bool
+    fields: List[FormField]
+    data: Dict[str, Any]  # Holds the dynamic values for each field named by 'name' in FormFields
+
+
+# # SubmitSlateModel defines the model structure for the slates once they're assigned to a user
+class SubmitSlateModel(BaseModel):
     id: str
     title: str
     description: str
-    organization: str
-    template: bool
+    project: str
+    owner: str
+    last_updated: datetime
     status: bool
     fields: List[FormField]
     data: Dict[str, Any]  # Holds the dynamic values for each field named by 'name' in FormFields
 
 
 class TemplateCollection(BaseModel):
-    forms: List[CreateFormModel]
+    forms: List[CreateSlateModel]
 
 
 class ProjectsCollection(BaseModel):
     user_projects: List[Projects]
 
 
-class FormsCollection(BaseModel):
-    forms: List[SubmitFormModel]
+class AssignedSlatesCollection(BaseModel):
+    slates: List[AssignSlateModel]
+
+
+class SlatesCollection(BaseModel):
+    slates: List[SubmitSlateModel]
+
 
 
 @app.get("/", tags=["root"])
 async def read_root() -> dict:
     return {"message": "Welcome!."}
+
 
 
 # Route for geting for getting the logged in user's profile
@@ -157,6 +177,7 @@ async def get_user_profile(auth0_id: str):
         print(f"Error retrieving user profile: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
     
+
 
 # Route for geting for getting the template form's
 @app.get(
@@ -186,14 +207,15 @@ async def list_forms(owner: str, status: str):
     return TemplateCollection(forms=forms)
 
 
+
 # Route for geting for getting the user's projects
 @app.get(
     "/Projects/",
-    response_description="List all Form Data",
+    response_description="List all projects",
     response_model=ProjectsCollection,
     response_model_by_alias=False,
 )
-async def list_forms(owner: str):
+async def list_projects(owner: str):
     
      # query sets the conditions which it searches for in the forms collection
     query = {"owner": owner}
@@ -207,22 +229,59 @@ async def list_forms(owner: str):
     return ProjectsCollection(user_projects=user_projects)
 
 
-# POST endpoint to accept and store cleans forms created by an Document Manager
-@app.post("/create-slate/")
-# async def submit_form(form: CreateFormModel = Body(...)): # FastAPI will automatically parse the JSON request body &- create an instance of the CreateFormModel class
-async def submit_form(form: CreateFormModel = Body(...)): # FastAPI will automatically parse the JSON request body &- create an instance of the CreateFormModel class
-    print('Received Form Data:', form)  # Add this line
-    try:
-        form_dict = form.model_dump(by_alias=True)  # Convert to dict, respecting field aliases if any
-        insert_result = await templates.insert_one(form_dict)
-        return {"message": "Form data submitted successfully", "id": str(insert_result.inserted_id)}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+
+# Route for geting for getting the slates assigned on a project
+@app.get(
+    "/user-slates/",
+    response_description="List all project slates",
+    response_model=SlatesCollection,
+    response_model_by_alias=False,
+)
+async def list_slates(owner: str, status: bool):
+    
+    # query sets the conditions which it searches for in the forms collection
+    query = {"owner": owner, "status": status}
+    slates = await assigned_slates.find(query).to_list(10000)
+    # print(query)
+
+    # Iterate over each form and store its _id in the dictionary
+    for i,form in enumerate(slates):
+        form_id = str(form["_id"])
+        form["id"] =  form_id # Add the index to the form data
+    print("slates:")
+    print(slates)
+    return SlatesCollection(slates=slates)
+
+
+
+# Route for geting for getting the slates assigned on a project
+@app.get(
+    "/project-slates/",
+    response_description="List all project slates",
+    response_model=AssignedSlatesCollection,
+    response_model_by_alias=False,
+)
+async def list_slates(project: str, owner: str):
+# async def list_slates(owner: str):
+    
+    # query sets the conditions which it searches for in the forms collection
+    query = {"project": project, "owner": owner}
+    # query = {"owner": owner}
+    slates = await assigned_slates.find(query).to_list(10000)
+    # print(query)
+
+    # Iterate over each form and store its _id in the dictionary
+    for i,form in enumerate(slates):
+        form_id = str(form["_id"])
+        form["id"] =  form_id # Add the index to the form data
+
+    return AssignedSlatesCollection(slates=slates)
+
 
 
 # POST endpoint to accept and store cleans forms created by an Document Manager
 @app.post("/create-project/")
-async def create_project(project: Projects = Body(...)): # FastAPI will automatically parse the JSON request body &- create an instance of the CreateFormModel class
+async def create_project(project: Projects = Body(...)):
     print('Received Form Data:', project)  # Add this line
     try:
         project_dict = project.model_dump(by_alias=True)  # Convert to dict, respecting field aliases if any
@@ -232,17 +291,30 @@ async def create_project(project: Projects = Body(...)): # FastAPI will automati
         raise HTTPException(status_code=500, detail=str(e))
 
 
+
+# POST endpoint to first assign slates to users
+@app.post("/assign-slate/")
+async def assign_slate(slate: AssignSlateModel = Body(...)):
+    try:
+        slate_dict = slate.model_dump(by_alias=True)  # Convert to dict, respecting field aliases if any
+        insert_result = await assigned_slates.insert_one(slate_dict)
+        return {"message": "slate successfully assigned", "id": str(insert_result.inserted_id)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
+
 # PUT endpoint to update the form data
 @app.put("/submit-form/{form_id}")
-async def update_form(form_id: str, form: SubmitFormModel = Body(...)):
+async def update_form(form_id: str, slate: SubmitSlateModel = Body(...)):
     # print('Received Form Data:', form)
     print('form_id', form_id)
     try:
         # Convert the form data to a dictionary
-        form_dict = form.model_dump(by_alias=True)
+        slate_dict = slate.model_dump(by_alias=True)
         
         # Update the form data in the database
-        update_result = await form_samples.update_one({"_id": ObjectId(form_id)}, {"$set": form_dict})
+        update_result = await assigned_slates.update_one({"_id": ObjectId(form_id)}, {"$set": slate_dict})
         
         if update_result.modified_count == 1:
             return {"message": "Form data updated successfully"}
@@ -251,16 +323,9 @@ async def update_form(form_id: str, form: SubmitFormModel = Body(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# # Route for adding an early bird request to the database
-# @app.put("/early-signon/")
-# async def update_user_profile(user_profile: EarlyBird = Body(...)):
-#     try:
-#         # Add the user to the early_bird database
-#         await early_birds.insert(user_profile)
-#         return {"message": "early bird request added to database"}
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=str(e))
-    
+
+
+# # Route for adding an early bird request to the database  
 @app.put("/early-signon/")
 async def update_user_profile(user_profile: EarlyBird = Body(...)):
     try:
@@ -269,6 +334,7 @@ async def update_user_profile(user_profile: EarlyBird = Body(...)):
         return {"message": "Early bird request added to database"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error adding early bird request to database: {str(e)}")
+
 
 
 # Route for updating the user profile  
@@ -303,3 +369,26 @@ async def update_user_profile(user_profile: PlatformUsers = Body(...)):
             return {"message": "User profile created successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# @app.get("/project-slates/")
+# async def debug_query(project: Optional[str] = Query(None), owner: Optional[str] = Query(None)):
+# # async def debug_query(project: Optional[str] = Query(None), owner: Optional[str] = Query(None)):
+#     query = {"project": project, "owner": owner}
+#     print('Query:', query)
+#     return query
+
+
+
+# @app.post("/assign-slate/")
+# async def assign_slate(request: Request, slate: AssignSlateModel = Body(...)):
+#     try:
+#         # Print the received data
+#         print('Received data:', await request.json())
+#         print('Received model data:', slate.model_dump())
+#         slate_dict = slate.model_dump(by_alias=True)
+#         insert_result = await assigned_slates.insert_one(slate_dict)
+#         return {"message": "slate successfully assigned", "id": str(insert_result.inserted_id)}
+#     except Exception as e:
+#         print('Error:', str(e))
+#         raise HTTPException(status_code=500, detail=str(e))
