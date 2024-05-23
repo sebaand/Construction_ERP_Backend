@@ -6,8 +6,13 @@ from datetime import date, datetime
 from typing_extensions import Annotated
 from bson import ObjectId
 import motor.motor_asyncio
-from pymongo import ReturnDocument
 import os
+
+# imports for pdf generation
+from fastapi.responses import StreamingResponse
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
+from io import BytesIO
 
 app = FastAPI()
 
@@ -49,11 +54,12 @@ class Projects(BaseModel):
 
 # Class for defining the model of the key data on the users
 class PlatformUsers(BaseModel):
-    first_name: str
-    last_name: str 
-    organization: str
-    username: str  
+    first_name: Optional[str]
+    last_name: Optional[str]
+    organization: Optional[str]
+    email: str  
     auth0_id: str
+    subscription_tier: str
 
 
 # Class for defining the model of the key data on an early_bird adoption
@@ -278,6 +284,40 @@ async def list_slates(project: str, owner: str):
     return AssignedSlatesCollection(slates=slates)
 
 
+# Route for generating pdfs from the available form data. 
+@app.get("/download-pdf/{form_id}")
+async def download_pdf(form_id: str):
+    form_data = await get_form_data(form_id)  # Implement this function to fetch form data from DB
+    if not form_data:
+        raise HTTPException(status_code=404, detail="Form not found")
+
+    buffer = BytesIO()
+    c = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
+
+    c.drawString(100, height - 100, f"Form Title: {form_data['title']}")
+    c.drawString(100, height - 120, f"Assignee: {form_data['assignee']}")
+    c.drawString(100, height - 140, f"Due Date: {form_data['due_date']}")
+    # Add more fields as needed
+
+    c.save()
+    buffer.seek(0)
+
+    return StreamingResponse(buffer, media_type="application/pdf", headers={"Content-Disposition": f"attachment;filename={form_data['title']}.pdf"})
+
+# POST endpoint to accept and store cleans forms created by an Document Manager
+@app.post("/create-slate/")
+# async def submit_form(form: CreateFormModel = Body(...)): # FastAPI will automatically parse the JSON request body &- create an instance of the CreateFormModel class
+async def submit_form(form: CreateSlateModel = Body(...)): # FastAPI will automatically parse the JSON request body &- create an instance of the CreateFormModel class
+    print('Received Form Data:', form)  # Add this line
+    try:
+        form_dict = form.model_dump(by_alias=True)  # Convert to dict, respecting field aliases if any
+        insert_result = await templates.insert_one(form_dict)
+        return {"message": "Form data submitted successfully", "id": str(insert_result.inserted_id)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 
 # POST endpoint to accept and store cleans forms created by an Document Manager
 @app.post("/create-project/")
@@ -351,7 +391,7 @@ async def update_user_profile(user_profile: PlatformUsers = Body(...)):
             user["first_name"] = user_profile.first_name
             user["last_name"] = user_profile.last_name
             user["organization"] = user_profile.organization
-            user["username"] = user_profile.username
+            user["email"] = user_profile.email
 
             # Update the user in the database
             await users.replace_one({"auth0_id": user_profile.auth0_id}, user)
@@ -362,7 +402,7 @@ async def update_user_profile(user_profile: PlatformUsers = Body(...)):
                 "first_name": user_profile.first_name,
                 "last_name": user_profile.last_name,
                 "organization": user_profile.organization,
-                "username": user_profile.username,
+                "email": user_profile.email,
                 "auth0_id": user_profile.auth0_id
             }
             await users.insert_one(new_user)
@@ -370,6 +410,38 @@ async def update_user_profile(user_profile: PlatformUsers = Body(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+
+# Route for updating the user profile  
+@app.post("/register/")
+async def register_user(request: Request):
+    user_profile = await request.json()
+    try:
+        # Update the user's profile fields
+        # Create a new user profile
+        new_user = {
+            # "email": user_profile.email,
+            # "auth0_id": user_profile.auth0_id,
+            # "subscription_tier": user_profile.subscription_tier
+            "email": user_profile["email"],
+            "auth0_id": user_profile["auth0_id"],
+            # "subscription_tier": user_profile["subscription_tier"],
+            "subscription_tier": "basic""
+        }
+        await users.insert_one(new_user)
+        return {"message": "User registered successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
+# Route for updating the user profile  
+@app.post("/login/")
+async def login_user():
+    try:
+        print("logged in!")
+        return {"message": "User registered successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # @app.get("/project-slates/")
 # async def debug_query(project: Optional[str] = Query(None), owner: Optional[str] = Query(None)):
