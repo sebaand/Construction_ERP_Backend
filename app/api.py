@@ -14,7 +14,19 @@ from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from io import BytesIO
 
+# imports for Auth0 roles:
+import json
+import requests
+from jose import jwt
+
 app = FastAPI()
+
+# Your Auth0 M2M application's client ID and client secret
+AUTH0_CLIENT_ID = os.getenv('AUTH0_CLIENT_ID')
+AUTH0_CLIENT_SECRET = os.getenv('AUTH0_CLIENT_SECRET')
+
+# Your Auth0 domain
+AUTH0_DOMAIN = os.getenv('AUTH0_DOMAIN')
 
 # MongoDB Database and Collections Declaration
 MONGODB_URL = f"mongodb+srv://andreasebastio014:{os.getenv('MONGO_DB_PASSWORD')}@cluster0.jqaqs3v.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
@@ -28,15 +40,15 @@ templates = db.get_collection("Templates")
 projects = db.get_collection("Projects")
 
 # Origins for local deployment during development stage. 
-origins = [
-    "http://localhost:3000",
-    "localhost:3000"
-]
+# origins = [
+#     "http://localhost:3000",
+#     "localhost:3000"
+# ]
 
 app.add_middleware(
     CORSMiddleware,
-    # allow_origins=['https://polyglotplus.com', 'https://www.polyglotplus.com'],
-    allow_origins=origins,
+    allow_origins=['https://polyglotplus.com'],
+    # allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]
@@ -284,26 +296,6 @@ async def list_slates(project: str, owner: str):
     return AssignedSlatesCollection(slates=slates)
 
 
-# Route for generating pdfs from the available form data. 
-@app.get("/download-pdf/{form_id}")
-async def download_pdf(form_id: str):
-    form_data = await get_form_data(form_id)  # Implement this function to fetch form data from DB
-    if not form_data:
-        raise HTTPException(status_code=404, detail="Form not found")
-
-    buffer = BytesIO()
-    c = canvas.Canvas(buffer, pagesize=A4)
-    width, height = A4
-
-    c.drawString(100, height - 100, f"Form Title: {form_data['title']}")
-    c.drawString(100, height - 120, f"Assignee: {form_data['assignee']}")
-    c.drawString(100, height - 140, f"Due Date: {form_data['due_date']}")
-    # Add more fields as needed
-
-    c.save()
-    buffer.seek(0)
-
-    return StreamingResponse(buffer, media_type="application/pdf", headers={"Content-Disposition": f"attachment;filename={form_data['title']}.pdf"})
 
 # POST endpoint to accept and store cleans forms created by an Document Manager
 @app.post("/create-slate/")
@@ -412,26 +404,65 @@ async def update_user_profile(user_profile: PlatformUsers = Body(...)):
 
 
 
+# # Route for updating the user profile  
+# @app.post("/register/")
+# async def register_user(request: Request):
+#     user_profile = await request.json()
+#     try:
+#         # Update the user's profile fields
+#         # Create a new user profile
+#         new_user = {
+#             "email": user_profile["email"],
+#             "auth0_id": user_profile["auth0_id"],
+#             "subscription_tier": "basic"
+#         }
+#         await users.insert_one(new_user)
+#         return {"message": "User registered successfully"}
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
+    
+
 # Route for updating the user profile  
 @app.post("/register/")
 async def register_user(request: Request):
     user_profile = await request.json()
-    try:
-        # Update the user's profile fields
-        # Create a new user profile
-        new_user = {
-            # "email": user_profile.email,
-            # "auth0_id": user_profile.auth0_id,
-            # "subscription_tier": user_profile.subscription_tier
+
+    new_user = {
             "email": user_profile["email"],
             "auth0_id": user_profile["auth0_id"],
-            # "subscription_tier": user_profile["subscription_tier"],
-            "subscription_tier": "basic""
+            "subscription_tier": "basic"
         }
-        await users.insert_one(new_user)
-        return {"message": "User registered successfully"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    await users.insert_one(new_user)
+    
+    # Process the user data and store it in your MongoDB database
+    # Assign the user a default "basic tier" role in your database
+    
+    # Generate an access token for the Auth0 Management API
+    payload = ({
+    "roles": [
+        "rol_qtPngFIhl1aJihaC"
+    ]
+    })
+
+    # Make a request to the Auth0 Management API to assign the role
+    url = f"https://{AUTH0_DOMAIN}/api/v2/users/{user_profile["auth0_id"]}/roles"
+    token = os.getenv('AUTH0_TOKEN')
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+    }
+    response = requests.post(url, headers=headers, data=json.dumps(payload))
+    print('Token:', token)
+    print("Response Status Code:", response.status_code)
+    print("Response Text:", response.text)
+    
+    if response.status_code == 204:
+        print("Role assigned successfully")
+    else:
+        print(f"Error assigning role: {response.text}")
+    
+    return {"message": "User registered successfully"}
+
     
 
 # Route for updating the user profile  
@@ -439,7 +470,7 @@ async def register_user(request: Request):
 async def login_user():
     try:
         print("logged in!")
-        return {"message": "User registered successfully"}
+        return {"message": "User logged in successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -464,3 +495,25 @@ async def login_user():
 #     except Exception as e:
 #         print('Error:', str(e))
 #         raise HTTPException(status_code=500, detail=str(e))
+
+
+# # Route for generating pdfs from the available form data. 
+# @app.get("/download-pdf/{form_id}")
+# async def download_pdf(form_id: str):
+#     form_data = await get_form_data(form_id)  # Implement this function to fetch form data from DB
+#     if not form_data:
+#         raise HTTPException(status_code=404, detail="Form not found")
+
+#     buffer = BytesIO()
+#     c = canvas.Canvas(buffer, pagesize=A4)
+#     width, height = A4
+
+#     c.drawString(100, height - 100, f"Form Title: {form_data['title']}")
+#     c.drawString(100, height - 120, f"Assignee: {form_data['assignee']}")
+#     c.drawString(100, height - 140, f"Due Date: {form_data['due_date']}")
+#     # Add more fields as needed
+
+#     c.save()
+#     buffer.seek(0)
+
+#     return StreamingResponse(buffer, media_type="application/pdf", headers={"Content-Disposition": f"attachment;filename={form_data['title']}.pdf"})
