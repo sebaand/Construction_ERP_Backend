@@ -40,15 +40,15 @@ templates = db.get_collection("Templates")
 projects = db.get_collection("Projects")
 
 # Origins for local deployment during development stage. 
-# origins = [
-#     "http://localhost:3000",
-#     "localhost:3000"
-# ]
+origins = [
+    "http://localhost:3000",
+    "localhost:3000"
+]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=['https://polyglotplus.com', 'https://www.polyglotplus.com'],
-    # allow_origins=origins,
+    # allow_origins=['https://polyglotplus.com', 'https://www.polyglotplus.com'],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]
@@ -445,7 +445,8 @@ async def register_user(request: Request):
     })
 
     # Make a request to the Auth0 Management API to assign the role
-    url = f"https://{AUTH0_DOMAIN}/api/v2/users/{user_profile["auth0_id"]}/roles"
+    # url = f"https://{AUTH0_DOMAIN}/api/v2/users/{user_profile["auth0_id"]}/roles"
+    url = f"https://{AUTH0_DOMAIN}/api/v2/users/{user_profile['auth0_id']}/roles"
     token = os.getenv('AUTH0_TOKEN')
     headers = {
         "Authorization": f"Bearer {token}",
