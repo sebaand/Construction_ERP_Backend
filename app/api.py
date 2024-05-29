@@ -47,7 +47,7 @@ projects = db.get_collection("Projects")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=['https://polyglotplus.com'],
+    allow_origins=['https://polyglotplus.com', 'https://www.polyglotplus.com'],
     # allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
