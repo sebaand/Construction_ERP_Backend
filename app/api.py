@@ -40,15 +40,15 @@ templates = db.get_collection("Templates")
 projects = db.get_collection("Projects")
 
 # Origins for local deployment during development stage. 
-origins = [
-    "http://localhost:3000",
-    "localhost:3000"
-]
+# origins = [
+#     "http://localhost:3000",
+#     "localhost:3000"
+# ]
 
 app.add_middleware(
     CORSMiddleware,
-    # allow_origins=['https://polyglotplus.com', 'https://www.polyglotplus.com'],
-    allow_origins=origins,
+    allow_origins=['https://www.polyglotplus.com'],
+    # allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]
