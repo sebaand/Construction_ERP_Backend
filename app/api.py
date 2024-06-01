@@ -40,15 +40,15 @@ templates = db.get_collection("Templates")
 projects = db.get_collection("Projects")
 
 # Origins for local deployment during development stage. 
-# origins = [
-#     "http://localhost:3000",
-#     "localhost:3000"
-# ]
+origins = [
+    "http://localhost:3000",
+    "localhost:3000"
+]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=['https://www.polyglotplus.com'],
-    # allow_origins=origins,
+    # allow_origins=['https://www.polyglotplus.com'],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]
@@ -252,7 +252,7 @@ async def list_projects(owner: str):
 @app.get(
     "/user-slates/",
     response_description="List all project slates",
-    response_model=SlatesCollection,
+    response_model=AssignedSlatesCollection,
     response_model_by_alias=False,
 )
 async def list_slates(owner: str, status: bool):
@@ -268,7 +268,7 @@ async def list_slates(owner: str, status: bool):
         form["id"] =  form_id # Add the index to the form data
     print("slates:")
     print(slates)
-    return SlatesCollection(slates=slates)
+    return AssignedSlatesCollection(slates=slates)
 
 
 
