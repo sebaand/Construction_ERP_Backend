@@ -130,6 +130,17 @@ class CreateSlateModel(BaseModel):
     fields: List[FormField]
     data: Dict[str, Any]  # Holds the dynamic values for each field named by 'name' in FormFields
 
+# # FormModel now contains a list of Slate Fields and a dictionary for the form data
+class SlateTemplateModel(BaseModel):
+    database_id: str
+    title: str
+    description: str
+    owner: str
+    last_updated: datetime
+    status: bool
+    fields: List[FormField]
+    data: Dict[str, Any]  # Holds the dynamic values for each field named by 'name' in FormFields
+
 
 # # FormModel now contains a list of Slate Fields and a dictionary for the form data
 class AssignSlateModel(BaseModel):
@@ -158,7 +169,7 @@ class SubmitSlateModel(BaseModel):
 
 
 class TemplateCollection(BaseModel):
-    forms: List[CreateSlateModel]
+    forms: List[SlateTemplateModel]
 
 
 class ProjectsCollection(BaseModel):
@@ -200,7 +211,7 @@ async def get_user_profile(auth0_id: str):
 # Route for geting for getting the template form's
 @app.get(
     "/FormData/",
-    response_description="List all Form Data",
+    response_description="List all slates",
     response_model=TemplateCollection,
     response_model_by_alias=False,
 )
@@ -220,8 +231,9 @@ async def list_forms(owner: str, status: str):
     # Iterate over each form and store its _id in the dictionary
     for i,form in enumerate(forms):
         form_id = str(form["_id"])
-        form["id"] =  form_id # Add the index to the form data
+        form["database_id"] =  form_id # Add the index to the form data
 
+    print(forms)
     return TemplateCollection(forms=forms)
 
 
@@ -243,7 +255,8 @@ async def list_projects(owner: str):
     for i,form in enumerate(user_projects):
         form_id = str(form["_id"])
         form["id"] =  form_id # Add the index to the form data
-
+        
+    
     return ProjectsCollection(user_projects=user_projects)
 
 
@@ -354,7 +367,20 @@ async def update_form(form_id: str, slate: SubmitSlateModel = Body(...)):
             raise HTTPException(status_code=404, detail="Form not found")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
 
+# PUT endpoint to delete a specific slatetemplate
+@app.delete("/delete-slate/{slate_id}")
+async def delete_slate(slate_id: str):
+    try:        
+        # Update the form data in the database
+        delete_result = await templates.delete_one({"_id": ObjectId(slate_id)})
+        if delete_result.deleted_count == 1:
+            return {"message": "Slate templates updated successfully"}
+        else:
+            raise HTTPException(status_code=404, detail="Slate template not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # # Route for adding an early bird request to the database  
