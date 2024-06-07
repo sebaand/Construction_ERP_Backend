@@ -42,7 +42,9 @@ projects = db.get_collection("Projects")
 # Origins for local deployment during development stage. 
 origins = [
     "http://localhost:3000",
-    "localhost:3000"
+    "localhost:3000", 
+    'https://www.polyglotplus.com',
+    'https://www.sitesteer.ai'
 ]
 
 app.add_middleware(
