@@ -362,12 +362,33 @@ async def update_form(form_id: str, slate: SubmitSlateModel = Body(...)):
         update_result = await assigned_slates.update_one({"_id": ObjectId(form_id)}, {"$set": slate_dict})
         
         if update_result.modified_count == 1:
-            return {"message": "Form data updated successfully"}
+            return {"message": "Slate data updated successfully"}
         else:
-            raise HTTPException(status_code=404, detail="Form not found")
+            raise HTTPException(status_code=404, detail="Slate not found")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
+
+
+@app.put("/update-slate/{templateId}")
+async def update_form(templateId: str, slate: CreateSlateModel = Body(...)):
+    print("Received Slate Data:", slate)
+    # print('Received Form Data:', form)
+    try:
+        # Convert the form data to a dictionary
+        print("Received Slate Data:", slate)
+        slate_dict = slate.model_dump(by_alias=True)
+        
+        # Update the form data in the database
+        update_result = await templates.update_one({"_id": ObjectId(templateId)}, {"$set": slate_dict})
+        
+        if update_result.modified_count == 1:
+            return {"message": "Slate template updated successfully"}
+        else:
+            print("Received Slate Data:", slate)
+            raise HTTPException(status_code=404, detail="Slate template not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 # PUT endpoint to delete a specific slatetemplate
 @app.delete("/delete-slate/{slate_id}")
@@ -544,3 +565,10 @@ async def login_user():
 #     buffer.seek(0)
 
 #     return StreamingResponse(buffer, media_type="application/pdf", headers={"Content-Disposition": f"attachment;filename={form_data['title']}.pdf"})
+
+
+# @app.put("/update-slate/{templateId}")
+# async def test_update_form(templateId: str, slate: dict = Body(...)):
+#     print("Received Slate id:", templateId)
+#     print("Received Slate Data:", slate)
+#     return {"message": "ok"}
