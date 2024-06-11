@@ -58,12 +58,16 @@ app.add_middleware(
 
 # Class for defining the model of the key data on the users
 class Projects(BaseModel):
+    database_id: str
     owner: str
     address: str
     currency: str
+    status: str
     projectName: str
     projectType: str  
     projectLead: str
+    estimated_date: datetime
+    completion_date: Optional[datetime]
 
 
 # Class for defining the model of the key data on the users
@@ -150,6 +154,7 @@ class AssignSlateModel(BaseModel):
     project: str
     description: str
     due_date: datetime
+    assigned_date: datetime
     owner: str
     last_updated: datetime
     status: bool
@@ -256,7 +261,7 @@ async def list_projects(owner: str):
     # Iterate over each form and store its _id in the dictionary
     for i,form in enumerate(user_projects):
         form_id = str(form["_id"])
-        form["id"] =  form_id # Add the index to the form data
+        form["database_id"] =  form_id # Add the index to the form data
         
     
     return ProjectsCollection(user_projects=user_projects)
@@ -392,6 +397,7 @@ async def update_form(templateId: str, slate: CreateSlateModel = Body(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+
 # PUT endpoint to delete a specific slatetemplate
 @app.delete("/delete-slate/{slate_id}")
 async def delete_slate(slate_id: str):
@@ -404,6 +410,22 @@ async def delete_slate(slate_id: str):
             raise HTTPException(status_code=404, detail="Slate template not found")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+   
+
+# PUT endpoint to delete a specific project
+@app.delete("/delete-project/{project_id}")
+async def delete_slate(project_id: str):
+    try:        
+        # Update the form data in the database
+        delete_result = await projects.delete_one({"_id": ObjectId(project_id)})
+        if delete_result.deleted_count == 1:
+            return {"message": "Project deleted"}
+        else:
+            raise HTTPException(status_code=404, detail="Project not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 
 # # Route for adding an early bird request to the database  
@@ -452,24 +474,6 @@ async def update_user_profile(user_profile: PlatformUsers = Body(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-
-# # Route for updating the user profile  
-# @app.post("/register/")
-# async def register_user(request: Request):
-#     user_profile = await request.json()
-#     try:
-#         # Update the user's profile fields
-#         # Create a new user profile
-#         new_user = {
-#             "email": user_profile["email"],
-#             "auth0_id": user_profile["auth0_id"],
-#             "subscription_tier": "basic"
-#         }
-#         await users.insert_one(new_user)
-#         return {"message": "User registered successfully"}
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=str(e))
-    
 
 # Route for updating the user profile  
 @app.post("/register/")
@@ -523,6 +527,7 @@ async def login_user():
         return {"message": "User logged in successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 # @app.get("/project-slates/")
 # async def debug_query(project: Optional[str] = Query(None), owner: Optional[str] = Query(None)):
