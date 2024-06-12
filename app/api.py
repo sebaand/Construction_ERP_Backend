@@ -150,6 +150,7 @@ class SlateTemplateModel(BaseModel):
 
 # # FormModel now contains a list of Slate Fields and a dictionary for the form data
 class AssignSlateModel(BaseModel):
+    database_id: str
     title: str
     project: str
     description: str
@@ -214,6 +215,9 @@ async def get_user_profile(auth0_id: str):
         raise HTTPException(status_code=500, detail="Internal Server Error")
     
 
+# # # # # # # # # # # # # # # # # # Slate Related Routes # # # # # # # # # # # # # # # # # # # # # # # #
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
+
 
 # Route for geting for getting the template form's
 @app.get(
@@ -245,29 +249,6 @@ async def list_forms(owner: str, status: str):
 
 
 
-# Route for geting for getting the user's projects
-@app.get(
-    "/Projects/",
-    response_description="List all projects",
-    response_model=ProjectsCollection,
-    response_model_by_alias=False,
-)
-async def list_projects(owner: str):
-    
-     # query sets the conditions which it searches for in the forms collection
-    query = {"owner": owner}
-    user_projects = await projects.find(query).to_list(10000)
-
-    # Iterate over each form and store its _id in the dictionary
-    for i,form in enumerate(user_projects):
-        form_id = str(form["_id"])
-        form["database_id"] =  form_id # Add the index to the form data
-        
-    
-    return ProjectsCollection(user_projects=user_projects)
-
-
-
 # Route for geting for getting the slates assigned on a project
 @app.get(
     "/user-slates/",
@@ -292,31 +273,6 @@ async def list_slates(owner: str, status: bool):
 
 
 
-# Route for geting for getting the slates assigned on a project
-@app.get(
-    "/project-slates/",
-    response_description="List all project slates",
-    response_model=AssignedSlatesCollection,
-    response_model_by_alias=False,
-)
-async def list_slates(project: str, owner: str):
-# async def list_slates(owner: str):
-    
-    # query sets the conditions which it searches for in the forms collection
-    query = {"project": project, "owner": owner}
-    # query = {"owner": owner}
-    slates = await assigned_slates.find(query).to_list(10000)
-    # print(query)
-
-    # Iterate over each form and store its _id in the dictionary
-    for i,form in enumerate(slates):
-        form_id = str(form["_id"])
-        form["id"] =  form_id # Add the index to the form data
-
-    return AssignedSlatesCollection(slates=slates)
-
-
-
 # POST endpoint to accept and store cleans forms created by an Document Manager
 @app.post("/create-slate/")
 # async def submit_form(form: CreateFormModel = Body(...)): # FastAPI will automatically parse the JSON request body &- create an instance of the CreateFormModel class
@@ -326,19 +282,6 @@ async def submit_form(form: CreateSlateModel = Body(...)): # FastAPI will automa
         form_dict = form.model_dump(by_alias=True)  # Convert to dict, respecting field aliases if any
         insert_result = await templates.insert_one(form_dict)
         return {"message": "Form data submitted successfully", "id": str(insert_result.inserted_id)}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-
-# POST endpoint to accept and store cleans forms created by an Document Manager
-@app.post("/create-project/")
-async def create_project(project: Projects = Body(...)):
-    print('Received Form Data:', project)  # Add this line
-    try:
-        project_dict = project.model_dump(by_alias=True)  # Convert to dict, respecting field aliases if any
-        insert_result = await projects.insert_one(project_dict)
-        return {"message": "project created successfully", "id": str(insert_result.inserted_id)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -376,6 +319,7 @@ async def update_form(form_id: str, slate: SubmitSlateModel = Body(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+
 @app.put("/update-slate/{templateId}")
 async def update_form(templateId: str, slate: CreateSlateModel = Body(...)):
     print("Received Slate Data:", slate)
@@ -410,8 +354,70 @@ async def delete_slate(slate_id: str):
             raise HTTPException(status_code=404, detail="Slate template not found")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
 
-   
+# Route for getting for getting the slates assigned on a project
+@app.get(
+    "/project-slates/",
+    response_description="List all project slates",
+    response_model=AssignedSlatesCollection,
+    response_model_by_alias=False,
+)
+async def list_slates(project: str, owner: str):
+# async def list_slates(owner: str):
+    
+    # query sets the conditions which it searches for in the forms collection
+    query = {"project": project, "owner": owner}
+    # query = {"owner": owner}
+    slates = await assigned_slates.find(query).to_list(10000)
+    # print(query)
+
+    # Iterate over each form and store its _id in the dictionary
+    for i,form in enumerate(slates):
+        form_id = str(form["_id"])
+        form["database_id"] =  form_id # Add the index to the form data
+
+    return AssignedSlatesCollection(slates=slates)
+
+
+# # # # # # # # # # # # # # # # # # Project Related Routes # # # # # # # # # # # # # # # # # # # # # # # # 
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+
+# POST endpoint to accept and store cleans forms created by an Document Manager
+@app.post("/create-project/")
+async def create_project(project: Projects = Body(...)):
+    try:
+        project_dict = project.model_dump(by_alias=True)  # Convert to dict, respecting field aliases if any
+        insert_result = await projects.insert_one(project_dict)
+        return {"message": "project created successfully", "id": str(insert_result.inserted_id)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+# Route for geting for getting the user's projects
+@app.get(
+    "/Projects/",
+    response_description="List all projects",
+    response_model=ProjectsCollection,
+    response_model_by_alias=False,
+)
+async def list_projects(owner: str):
+    
+     # query sets the conditions which it searches for in the forms collection
+    query = {"owner": owner}
+    user_projects = await projects.find(query).to_list(10000)
+
+    # Iterate over each form and store its _id in the dictionary
+    for i,form in enumerate(user_projects):
+        form_id = str(form["_id"])
+        form["database_id"] =  form_id # Add the index to the form data
+        
+    
+    return ProjectsCollection(user_projects=user_projects)
+
+
 
 # PUT endpoint to delete a specific project
 @app.delete("/delete-project/{project_id}")
@@ -425,7 +431,66 @@ async def delete_slate(project_id: str):
             raise HTTPException(status_code=404, detail="Project not found")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
 
+
+# # Route for setting the status of a project to archived 
+@app.put("/archive-project/{project_id}")
+async def update_user_profile(project_id: str):
+    project = await projects.find_one({"_id": ObjectId(project_id)})
+    try:
+        # Add the user to the early_bird database
+        project["status"] = 'Archived'
+        await projects.replace_one({"_id": ObjectId(project_id)}, project)
+        return {"message": "Early bird request added to database"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error adding early bird request to database: {str(e)}")
+    
+
+
+# Route for updating the user profile  
+@app.put("/edit-project/")
+async def update_user_profile(project_info: Projects = Body(...)):
+    try:
+        # Find the user in the database by auth0_id
+        project = await projects.find_one({"_id": ObjectId(project_info.database_id)})
+        # Update the user's profile fields
+        project["database_id"] = project_info.database_id
+        project["status"] = project_info.status
+        project["owner"] = project_info.owner
+        project["address"] = project_info.address
+        project["currency"] = project_info.currency
+        project["projectName"] = project_info.projectName
+        project["projectType"] = project_info.projectType
+        project["projectLead"] = project_info.projectLead
+        project["estimated_date"] = project_info.estimated_date
+        project["completion_date"] = project_info.completion_date
+        # Update the user in the database
+        await projects.replace_one({"_id": ObjectId(project_info.database_id)}, project)
+        return {"message": "Project updated successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
+# # # # # # # # # # # # # # # # # # Project Details Routes # # # # # # # # # # # # # # # # # # # # # # # # 
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+
+# PUT endpoint to delete a specific project
+@app.delete("/delete-assigned-slate/{slate_id}")
+async def delete_assigned_slate(slate_id: str):
+    try:        
+        # Update the form data in the database
+        delete_result = await assigned_slates.delete_one({"_id": ObjectId(slate_id)})
+        if delete_result.deleted_count == 1:
+            return {"message": "Assigned slate deleted"}
+        else:
+            raise HTTPException(status_code=404, detail="Slate not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# # # # # # # # # # # # # # # # # # Registration & Signon Routes # # # # # # # # # # # # # # # # # # # # # # # #
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
 
 
 # # Route for adding an early bird request to the database  
@@ -443,9 +508,9 @@ async def update_user_profile(user_profile: EarlyBird = Body(...)):
 # Route for updating the user profile  
 @app.put("/user-profile/")
 async def update_user_profile(user_profile: PlatformUsers = Body(...)):
-    user = await users.find_one({"auth0_id": user_profile.auth0_id})
-    print("user: ", user)
-    print("user_profile: ", user_profile.first_name)
+    # user = await users.find_one({"auth0_id": user_profile.auth0_id})
+    # print("user: ", user)
+    # print("user_profile: ", user_profile.first_name)
     try:
         # Find the user in the database by auth0_id
         user = await users.find_one({"auth0_id": user_profile.auth0_id})
