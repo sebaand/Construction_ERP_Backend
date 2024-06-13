@@ -150,7 +150,7 @@ class SlateTemplateModel(BaseModel):
 
 # # FormModel now contains a list of Slate Fields and a dictionary for the form data
 class AssignSlateModel(BaseModel):
-    database_id: str
+    database_id: Optional[str]
     title: str
     project: str
     description: str
@@ -354,30 +354,6 @@ async def delete_slate(slate_id: str):
             raise HTTPException(status_code=404, detail="Slate template not found")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
-
-# Route for getting for getting the slates assigned on a project
-@app.get(
-    "/project-slates/",
-    response_description="List all project slates",
-    response_model=AssignedSlatesCollection,
-    response_model_by_alias=False,
-)
-async def list_slates(project: str, owner: str):
-# async def list_slates(owner: str):
-    
-    # query sets the conditions which it searches for in the forms collection
-    query = {"project": project, "owner": owner}
-    # query = {"owner": owner}
-    slates = await assigned_slates.find(query).to_list(10000)
-    # print(query)
-
-    # Iterate over each form and store its _id in the dictionary
-    for i,form in enumerate(slates):
-        form_id = str(form["_id"])
-        form["database_id"] =  form_id # Add the index to the form data
-
-    return AssignedSlatesCollection(slates=slates)
 
 
 # # # # # # # # # # # # # # # # # # Project Related Routes # # # # # # # # # # # # # # # # # # # # # # # # 
@@ -476,6 +452,31 @@ async def update_user_profile(project_info: Projects = Body(...)):
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 
+# Route for getting for getting the slates assigned on a project
+@app.get(
+    "/project-slates/",
+    response_description="List all project slates",
+    response_model=AssignedSlatesCollection,
+    response_model_by_alias=False,
+)
+async def list_slates(project: str, owner: str):
+# async def list_slates(owner: str):
+    
+    # query sets the conditions which it searches for in the forms collection
+    query = {"project": project, "owner": owner}
+    # query = {"owner": owner}
+    slates = await assigned_slates.find(query).to_list(10000)
+    # print(query)
+
+    # Iterate over each form and store its _id in the dictionary
+    for i,form in enumerate(slates):
+        form_id = str(form["_id"])
+        form["database_id"] =  form_id # Add the index to the form data
+
+    return AssignedSlatesCollection(slates=slates)
+
+
+
 # PUT endpoint to delete a specific project
 @app.delete("/delete-assigned-slate/{slate_id}")
 async def delete_assigned_slate(slate_id: str):
@@ -488,7 +489,24 @@ async def delete_assigned_slate(slate_id: str):
             raise HTTPException(status_code=404, detail="Slate not found")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
 
+
+# PUT endpoint to delete a specific project
+@app.put("/edit-assigned-slate/{slate_id}")
+async def edit_assigned_slate(slate_id: str, update: AssignSlateModel = Body(...)):
+    assigned_slate = await assigned_slates.find_one({"_id": ObjectId(slate_id)})
+    try:        
+        # Update the form data in the database
+        assigned_slate["due_date"] = update.due_date
+        assigned_slate["owner"] = update.owner
+        assigned_slate["database_id"] = slate_id
+        print(assigned_slate)
+        await assigned_slates.replace_one({"_id": ObjectId(slate_id)}, assigned_slate)
+        return {"message": "Assigned slate updated"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
 # # # # # # # # # # # # # # # # # # Registration & Signon Routes # # # # # # # # # # # # # # # # # # # # # # # #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
 
