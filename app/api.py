@@ -6,7 +6,6 @@ from datetime import date, datetime
 from typing_extensions import Annotated
 from bson import ObjectId
 import motor.motor_asyncio
-import os
 
 # imports for pdf generation
 from fastapi.responses import StreamingResponse
@@ -18,6 +17,7 @@ from io import BytesIO
 import json
 import requests
 from jose import jwt
+import os
 
 app = FastAPI()
 
@@ -33,7 +33,7 @@ MONGODB_URL = f"mongodb+srv://andreasebastio014:{os.getenv('MONGO_DB_PASSWORD')}
 client = motor.motor_asyncio.AsyncIOMotorClient(MONGODB_URL)
 db = client.Forms
 form_samples = db.get_collection("Samples")
-users = db.get_collection("Users")
+platform_users = db.get_collection("Users")
 assigned_slates = db.get_collection("Assigned_Slates")
 early_birds = db.get_collection("Early_Birds")
 templates = db.get_collection("Templates")
@@ -72,9 +72,11 @@ class Projects(BaseModel):
 
 # Class for defining the model of the key data on the users
 class PlatformUsers(BaseModel):
+    database_id: Optional[str]
     first_name: Optional[str]
     last_name: Optional[str]
     organization: Optional[str]
+    organization_id: Optional[str]
     email: str  
     auth0_id: str
     subscription_tier: str
@@ -188,6 +190,10 @@ class AssignedSlatesCollection(BaseModel):
     slates: List[AssignSlateModel]
 
 
+class UsersCollection(BaseModel):
+    users: List[PlatformUsers]
+
+
 class SlatesCollection(BaseModel):
     slates: List[SubmitSlateModel]
 
@@ -203,7 +209,7 @@ async def read_root() -> dict:
 @app.get("/user-profile/{auth0_id}", response_model=Optional[PlatformUsers])
 async def get_user_profile(auth0_id: str):
     try:
-        user = await users.find_one({"auth0_id": auth0_id})
+        user = await platform_users.find_one({"auth0_id": auth0_id})
         print("User:", user)
         if user:
             return PlatformUsers(**user)
@@ -492,7 +498,7 @@ async def delete_assigned_slate(slate_id: str):
     
 
 
-# PUT endpoint to delete a specific project
+# PUT endpoint to update information of an assigned slate
 @app.put("/edit-assigned-slate/{slate_id}")
 async def edit_assigned_slate(slate_id: str, update: AssignSlateModel = Body(...)):
     assigned_slate = await assigned_slates.find_one({"_id": ObjectId(slate_id)})
@@ -508,7 +514,23 @@ async def edit_assigned_slate(slate_id: str, update: AssignSlateModel = Body(...
         raise HTTPException(status_code=500, detail=str(e))
     
 # # # # # # # # # # # # # # # # # # Registration & Signon Routes # # # # # # # # # # # # # # # # # # # # # # # #
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
+
+
+def get_auth0_token():
+    url = f"https://{AUTH0_DOMAIN}/oauth/token"
+    payload = {
+        "grant_type": "client_credentials",
+        "client_id": os.getenv("AUTH0_CLIENT_ID"),
+        "client_secret": os.getenv("AUTH0_CLIENT_SECRET"),
+        "audience": f"https://{AUTH0_DOMAIN}/api/v2/"
+    }
+    response = requests.post(url, data=payload)
+    if response.status_code == 200:
+        return response.json()["access_token"]
+    else:
+        raise Exception("Failed to obtain Auth0 access token")
+    
 
 
 # # Route for adding an early bird request to the database  
@@ -531,7 +553,7 @@ async def update_user_profile(user_profile: PlatformUsers = Body(...)):
     # print("user_profile: ", user_profile.first_name)
     try:
         # Find the user in the database by auth0_id
-        user = await users.find_one({"auth0_id": user_profile.auth0_id})
+        user = await platform_users.find_one({"auth0_id": user_profile.auth0_id})
         if user:
             # Update the user's profile fields
             user["first_name"] = user_profile.first_name
@@ -540,7 +562,7 @@ async def update_user_profile(user_profile: PlatformUsers = Body(...)):
             user["email"] = user_profile.email
 
             # Update the user in the database
-            await users.replace_one({"auth0_id": user_profile.auth0_id}, user)
+            await platform_users.replace_one({"auth0_id": user_profile.auth0_id}, user)
             return {"message": "User profile updated successfully"}
         else:
             # Create a new user profile
@@ -551,7 +573,7 @@ async def update_user_profile(user_profile: PlatformUsers = Body(...)):
                 "email": user_profile.email,
                 "auth0_id": user_profile.auth0_id
             }
-            await users.insert_one(new_user)
+            await platform_users.insert_one(new_user)
             return {"message": "User profile created successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -566,10 +588,15 @@ async def register_user(request: Request):
     new_user = {
             "email": user_profile["email"],
             "auth0_id": user_profile["auth0_id"],
-            "subscription_tier": "basic"
+            "subscription_tier": "Basic",
+            'database_id': None,
+            "first_name": None,
+            "last_name": None,
+            "organization": None,
+            "organization_id": None,
         }
-    await users.insert_one(new_user)
-    
+    await platform_users.insert_one(new_user)
+
     # Process the user data and store it in your MongoDB database
     # Assign the user a default "basic tier" role in your database
     
@@ -581,15 +608,13 @@ async def register_user(request: Request):
     })
 
     # Make a request to the Auth0 Management API to assign the role
-    # url = f"https://{AUTH0_DOMAIN}/api/v2/users/{user_profile["auth0_id"]}/roles"
     url = f"https://{AUTH0_DOMAIN}/api/v2/users/{user_profile['auth0_id']}/roles"
-    token = os.getenv('AUTH0_TOKEN')
+    token = token = get_auth0_token()  # Obtain the access token
     headers = {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json",
     }
     response = requests.post(url, headers=headers, data=json.dumps(payload))
-    print('Token:', token)
     print("Response Status Code:", response.status_code)
     print("Response Text:", response.text)
     
@@ -612,12 +637,88 @@ async def login_user():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# @app.get("/project-slates/")
-# async def debug_query(project: Optional[str] = Query(None), owner: Optional[str] = Query(None)):
-# # async def debug_query(project: Optional[str] = Query(None), owner: Optional[str] = Query(None)):
-#     query = {"project": project, "owner": owner}
-#     print('Query:', query)
-#     return query
+# # # # # # # # # # # # # # # # # # Admin Panel Routes # # # # # # # # # # # # # # # # # # # # # # # #
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
+
+
+# Route for geting for getting the slates assigned on a project
+@app.get(
+    "/users/",
+    response_description="List all users",
+    response_model=UsersCollection,
+    response_model_by_alias=False,
+)
+async def list_users():
+    # query sets the conditions which it searches for in the forms collection
+    users = await platform_users.find().to_list(1000000)
+    # print(query)
+
+    # Iterate over each form and store its _id in the dictionary
+    for i,form in enumerate(users):
+        form_id = str(form["_id"])
+        form["database_id"] =  form_id # Add the index to the form data
+
+    return UsersCollection(users=users)
+
+
+
+class UpdateUsersRequest(BaseModel):
+    user_ids: List[str]
+    updated_fields: dict
+
+@app.put("/update-users/")
+async def update_users(request: UpdateUsersRequest):
+    user_ids = request.user_ids
+    updated_fields = request.updated_fields
+    print(user_ids)
+    print(updated_fields)
+    try:
+        for i in range(len(user_ids)):
+            # Check the length of user_ids as the entry fields that can be modified are different for a single select and multiselect
+            if(len(user_ids)==1):
+                # Update the users with the specified database_ids and updated fields
+                user = await platform_users.find_one({"_id": ObjectId(user_ids[i])})
+                # Update the user's profile fields
+                user["first_name"] = updated_fields["first_name"]
+                user["last_name"] = updated_fields["last_name"]
+                user["organization"] = updated_fields["organization"]
+                user["organization_id"] = updated_fields["organization_id"]
+                user["subscription_tier"] = updated_fields["subscription_tier"]
+                await platform_users.replace_one({"_id": ObjectId(user_ids[i])}, user)
+            else: 
+                user = await platform_users.find_one({"_id": ObjectId(user_ids[i])})
+                user["organization"] = updated_fields["organization"]
+                user["organization_id"] = updated_fields["organization_id"]
+                await platform_users.replace_one({"_id": ObjectId(user_ids[i])}, user)
+        return {"message": "User profile updated successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+# Delete endpoint to delete a users
+@app.delete("/delete-users/")
+async def delete_users(user_ids: List[str]):
+    print(user_ids)
+    try:
+        for i in range(len(user_ids)):
+            print("Received user id:", user_ids[i])
+            # Delete the users with the specified database_ids
+            await platform_users.delete_one({"_id": ObjectId(user_ids[i])})
+        return {"message": f"Deleted users with id {user_ids[i]}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+# @app.put("/update-users/")
+# async def update_users(request: UpdateUsersRequest):
+#     user_ids = request.user_ids
+#     updated_fields = request.updated_fields
+#     for i in range(len(user_ids)):
+#         print("Received user id:", user_ids[i])
+#     print("updated_fields:", updated_fields["first_name"])
+#     return {"message": "ok"}
 
 
 
