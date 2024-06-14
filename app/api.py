@@ -581,7 +581,7 @@ async def update_user_profile(user_profile: PlatformUsers = Body(...)):
 
 
 # Route for updating the user profile  
-@app.post("/register/")
+@app.post("/register")
 async def register_user(request: Request):
     user_profile = await request.json()
 
@@ -710,6 +710,41 @@ async def delete_users(user_ids: List[str]):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# # # # # # # # # # # # # # # # # # Manage Team Routes # # # # # # # # # # # # # # # # # # # # # # # # # # # 
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
+
+
+# Route for geting for getting the slates assigned on a project
+@app.get(
+    "/team/",
+    response_description="List all users in the same organization",
+    response_model=UsersCollection,
+    response_model_by_alias=False,
+)
+async def list_team_users(owner: str):
+    # Find the owner's document in the platform_users collection
+    print(owner)
+    org_admin = await platform_users.find_one({"email": owner})
+    print(org_admin)
+    
+    if org_admin:
+        # Retrieve the organization_id of the owner
+        owner_org_id = org_admin["organization_id"]
+        
+        # Query the platform_users collection to find all users with the same organization_id as the owner
+        query = {"organization_id": owner_org_id}
+        users = await platform_users.find(query).to_list(None)
+        
+        # Iterate over each user and store its _id in the dictionary
+        for i, user in enumerate(users):
+            user_id = str(user["_id"])
+            user["database_id"] = user_id  # Add the index to the user data
+        
+        return UsersCollection(users=users)
+    
+    else:
+        # If the owner is not found, return an empty list of users
+        return UsersCollection(users=[])
 
 # @app.put("/update-users/")
 # async def update_users(request: UpdateUsersRequest):
