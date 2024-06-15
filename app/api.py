@@ -431,7 +431,7 @@ async def update_user_profile(project_id: str):
 
 
 # Route for updating the user profile  
-@app.put("/edit-project/")
+@app.put("/edit-project")
 async def update_user_profile(project_info: Projects = Body(...)):
     try:
         # Find the user in the database by auth0_id
