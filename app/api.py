@@ -402,13 +402,17 @@ async def list_projects(owner: str):
 
 
 # PUT endpoint to delete a specific project
-@app.delete("/delete-project/{project_id}")
-async def delete_slate(project_id: str):
+@app.delete("/delete-project/")
+async def delete_slate(project_id: str, projectName: str, projectOwner: str):
+    query = {"owner": projectOwner, "project": projectName}
     try:        
         # Update the form data in the database
         delete_result = await projects.delete_one({"_id": ObjectId(project_id)})
         if delete_result.deleted_count == 1:
-            return {"message": "Project deleted"}
+            slates2delete = await assigned_slates.find(query).to_list(None)
+            for i in range(len(slates2delete)):
+                await assigned_slates.delete_one({"_id": slates2delete[i]["_id"]})
+            return {"message": "Project and related slates deleted"}
         else:
             raise HTTPException(status_code=404, detail="Project not found")
     except Exception as e:
@@ -471,7 +475,7 @@ async def list_slates(project: str, owner: str):
     # query sets the conditions which it searches for in the forms collection
     query = {"project": project, "owner": owner}
     # query = {"owner": owner}
-    slates = await assigned_slates.find(query).to_list(10000)
+    slates = await assigned_slates.find(query).to_list(None)
     # print(query)
 
     # Iterate over each form and store its _id in the dictionary
