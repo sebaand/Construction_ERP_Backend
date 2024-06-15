@@ -534,7 +534,7 @@ def get_auth0_token():
 
 
 # # Route for adding an early bird request to the database  
-@app.put("/early-signon/")
+@app.put("/early-signon")
 async def update_user_profile(user_profile: EarlyBird = Body(...)):
     try:
         # Add the user to the early_bird database
@@ -546,7 +546,7 @@ async def update_user_profile(user_profile: EarlyBird = Body(...)):
 
 
 # Route for updating the user profile  
-@app.put("/user-profile/")
+@app.put("/user-profile")
 async def update_user_profile(user_profile: PlatformUsers = Body(...)):
     # user = await users.find_one({"auth0_id": user_profile.auth0_id})
     # print("user: ", user)
@@ -666,7 +666,7 @@ class UpdateUsersRequest(BaseModel):
     user_ids: List[str]
     updated_fields: dict
 
-@app.put("/update-users/")
+@app.put("/update-users")
 async def update_users(request: UpdateUsersRequest):
     user_ids = request.user_ids
     updated_fields = request.updated_fields
