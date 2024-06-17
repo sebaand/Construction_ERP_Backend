@@ -70,21 +70,12 @@ class Projects(BaseModel):
     completion_date: Optional[datetime]
 
 
-# # Class for defining the model of the key data on the users
-# class PlatformUsers(BaseModel):
-#     database_id: Optional[str]
-#     first_name: Optional[str]
-#     last_name: Optional[str]
-#     organization: Optional[str]
-#     organization_id: Optional[str]
-#     email: str  
-#     auth0_id: str
-#     subscription_tier: str
 class PlatformUsers(BaseModel):
     database_id: Optional[str]
     name: Optional[str]
     organization: Optional[str]
     organization_id: List[Dict[str, str]] = None
+    # organization_id: Optional[List[Union[Dict[str, str], str]]] = None
     email: str
     auth0_id: str
 
@@ -648,7 +639,7 @@ async def login_user():
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
 
 
-# Route for geting for getting the slates assigned on a project
+# Route for getting all the users signed up to your platform. 
 @app.get(
     "/users/",
     response_description="List all users",
@@ -677,6 +668,8 @@ class UpdateUsersRequest(BaseModel):
 async def update_users(request: UpdateUsersRequest):
     user_ids = request.user_ids
     updated_fields = request.updated_fields
+    print(user_ids)
+    print(updated_fields)
     try:
         for i in range(len(user_ids)): # Check the length of user_ids as the entry fields that can be modified are different for a single select and multiselect
 
@@ -695,7 +688,7 @@ async def update_users(request: UpdateUsersRequest):
                 # Update the users with the specified database_ids and updated fields
                 user = await platform_users.find_one({"_id": ObjectId(user_ids[i])})
                 # Update the user's profile fields
-                user["name"] = updated_fields["first_name"]
+                user["name"] = updated_fields["name"]
                 user["organization"] = updated_fields["organization"]
                 
                 # Compare the existing organization_id with the updated organization_id
@@ -771,7 +764,7 @@ async def delete_users(user_ids: List[str]):
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
 
 
-# Route for geting for getting the slates assigned on a project
+# Route for geting for getting the team members associated with an organization.
 @app.get(
     "/team/",
     response_description="List all users in the same organization",
@@ -782,22 +775,50 @@ async def list_team_users(owner: str):
     # Find the owner's document in the platform_users collection
     org_admin = await platform_users.find_one({"email": owner})
     print(owner)
-
-    if org_admin:
-        # Retrieve the organization_id of the owner
-        owner_org_id = org_admin["organization_id"]
-        
-        # Query the platform_users collection to find all users with the same organization_id as the owner
-        query = {"organization_id": owner_org_id}
-        users = await platform_users.find(query).to_list(None)
-        
-        # Iterate over each user and store its _id in the dictionary
-        for i, user in enumerate(users):
-            user_id = str(user["_id"])
-            user["database_id"] = user_id  # Add the index to the user data
-        
-        return UsersCollection(users=users)
     
+    if org_admin:
+        # Retrieve the organization_id list of the owner
+        owner_org_ids = org_admin["organization_id"]
+        
+        # Find the organization_id key for which the value is "Premium User"
+        premium_org_id = None
+        for org_id_dict in owner_org_ids:
+            for key, value in org_id_dict.items():
+                if value == "Premium User":
+                    premium_org_id = key
+                    break
+            if premium_org_id:
+                break
+        
+        if premium_org_id:
+            # Query the platform_users collection to find all users with the premium_org_id in their organization_id list
+            query = {"organization_id": {"$elemMatch": {premium_org_id: {"$exists": True}}}}
+            users = await platform_users.find(query).to_list(None)
+            
+            # Iterate over each user and modify the data to match the model
+            for user in users:
+                user["database_id"] = str(user["_id"])
+                
+                # # Convert organization_id to a list of dictionaries
+                # user["organization_id"] = [
+                #     {key: str(value)} for org_id in user["organization_id"] for key, value in org_id.items()
+                # ]
+                
+                    # Convert organization_id to a list of dictionaries
+                user["organization_id"] = [
+                    {key: str(value[0]) if isinstance(value, list) else str(value)}
+                    for org_id in user["organization_id"]
+                    for key, value in org_id.items()
+                ]
+
+                # Ensure auth0_id is a string
+                user["auth0_id"] = str(user["auth0_id"]) if user["auth0_id"] else ""
+            
+            print(users)
+            return UsersCollection(users=users)
+        else:
+            # If no organization_id with value "Premium User" is found, return an empty list of users
+            return UsersCollection(users=[])
     else:
         # If the owner is not found, return an empty list of users
         return UsersCollection(users=[])
