@@ -809,25 +809,34 @@ async def add_user(user_fields: dict, email: str):
     # Retrieve the admin user based on the provided email
     admin = await platform_users.find_one({"email": email})
     user = await platform_users.find_one({"email": user_fields["email"]})
-    print(admin)
-    print(user)
-    # return {"message": "User added successfully"}
+    print(user_fields)
+
+    if not admin:
+        raise HTTPException(status_code=404, detail="Admin user not found")
+
     try:
         if user:
             print(1)
             # Update the user's profile fields
-            organization = user["organization"] if user["organization"] else admin["organization"]
-            database_id = user["database_id"] if user["database_id"] else None
-            auth0_id = user["auth0_id"] if user["auth0_id"] else None
-            
+            organization = user.get("organization", admin["organization"])
+            database_id = user.get("database_id")
+            auth0_id = user.get("auth0_id")
+
             # Check if the user already has an organization_id array
-            if user["organization_id"]:
+            if user.get("organization_id"):
                 # Append the new value pair to the existing organization_id array
-                organization_id = user["organization_id"] + [{str(ObjectId()): user_fields["subscription_tier"]}]
+                organization_id = user["organization_id"]
+                # Update the subscription tier for the existing key
+                for item in organization_id:
+                    key = list(item.keys())[0]
+                    if key == list(admin["organization_id"][0].keys())[0]:
+                        item[key] = user_fields["organization_id"]
+                        break
             else:
-                # Create a new organization_id array with the value pair
-                organization_id = [{str(ObjectId()): user_fields["subscription_tier"]}]
-            
+                # Create a new organization_id array with the value pair using the admin's key
+                admin_key = list(admin["organization_id"][0].keys())[0]
+                organization_id = [{admin_key: user_fields["organization_id"]}]
+
             new_user = {
                 "name": user_fields["name"],
                 "email": user_fields["email"],
@@ -840,18 +849,19 @@ async def add_user(user_fields: dict, email: str):
             await platform_users.update_one({"email": user_fields["email"]}, {"$set": new_user})
             return {"message": "User updated successfully"}
         else:
-            print(2)
+            # Get the key from the admin's organization_id
+            admin_key = list(admin["organization_id"][0].keys())[0]
+            print(admin_key)
             new_user = {
                 "name": user_fields["name"],
                 "email": user_fields["email"],
                 "organization": admin["organization"],
-                "organization_id": admin["organization_id"] + [{str(ObjectId()): user_fields["subscription_tier"]}],
+                "organization_id": [{admin_key: user_fields["organization_id"]}],
                 "database_id": None,
                 "auth0_id": None
             }
             # Insert the new user into the database
-            # print(new_user)
-            # await platform_users.insert_one(new_user)
+            await platform_users.insert_one(new_user)
             return {"message": "User added successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
