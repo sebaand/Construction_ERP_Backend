@@ -82,13 +82,11 @@ class Projects(BaseModel):
 #     subscription_tier: str
 class PlatformUsers(BaseModel):
     database_id: Optional[str]
-    first_name: Optional[str]
-    last_name: Optional[str]
+    name: Optional[str]
     organization: Optional[str]
-    organization_id: Optional[List[Dict[str, str]]] = None
+    organization_id: List[Dict[str, str]] = None
     email: str
     auth0_id: str
-    subscription_tier: str
 
 # Class for defining the model of the key data on an early_bird adoption
 class EarlyBird(BaseModel):
@@ -569,8 +567,7 @@ async def update_user_profile(user_profile: PlatformUsers = Body(...)):
         user = await platform_users.find_one({"auth0_id": user_profile.auth0_id})
         if user:
             # Update the user's profile fields
-            user["first_name"] = user_profile.first_name
-            user["last_name"] = user_profile.last_name
+            user["name"] = user_profile.name
             user["organization"] = user_profile.organization
             user["email"] = user_profile.email
 
@@ -580,8 +577,7 @@ async def update_user_profile(user_profile: PlatformUsers = Body(...)):
         else:
             # Create a new user profile
             new_user = {
-                "first_name": user_profile.first_name,
-                "last_name": user_profile.last_name,
+                "name": user_profile.name,
                 "organization": user_profile.organization,
                 "email": user_profile.email,
                 "auth0_id": user_profile.auth0_id
@@ -601,10 +597,8 @@ async def register_user(request: Request):
     new_user = {
             "email": user_profile["email"],
             "auth0_id": user_profile["auth0_id"],
-            "subscription_tier": "Basic",
             'database_id': None,
-            "first_name": None,
-            "last_name": None,
+            "name": None,
             "organization": None,
             "organization_id": [],
         }
@@ -622,7 +616,7 @@ async def register_user(request: Request):
 
     # Make a request to the Auth0 Management API to assign the role
     url = f"https://{AUTH0_DOMAIN}/api/v2/users/{user_profile['auth0_id']}/roles"
-    token = token = get_auth0_token()  # Obtain the access token
+    token = get_auth0_token()  # Obtain the access token
     headers = {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json",
@@ -679,50 +673,29 @@ class UpdateUsersRequest(BaseModel):
     user_ids: List[str]
     updated_fields: dict
 
-# @app.put("/update-users")
-# async def update_users(request: UpdateUsersRequest):
-#     user_ids = request.user_ids
-#     updated_fields = request.updated_fields
-#     print(user_ids)
-#     print(updated_fields)
-#     try:
-#         for i in range(len(user_ids)):
-#             # Check the length of user_ids as the entry fields that can be modified are different for a single select and multiselect
-#             if(len(user_ids)==1):
-#                 # Update the users with the specified database_ids and updated fields
-#                 user = await platform_users.find_one({"_id": ObjectId(user_ids[i])})
-#                 # Update the user's profile fields
-#                 user["first_name"] = updated_fields["first_name"]
-#                 user["last_name"] = updated_fields["last_name"]
-#                 user["organization"] = updated_fields["organization"]
-#                 user["organization_id"] = updated_fields["organization_id"]
-#                 user["subscription_tier"] = updated_fields["subscription_tier"]
-#                 await platform_users.replace_one({"_id": ObjectId(user_ids[i])}, user)
-#             else: 
-#                 user = await platform_users.find_one({"_id": ObjectId(user_ids[i])})
-#                 user["organization"] = updated_fields["organization"]
-#                 user["organization_id"] = updated_fields["organization_id"]
-#                 await platform_users.replace_one({"_id": ObjectId(user_ids[i])}, user)
-#         return {"message": "User profile updated successfully"}
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=str(e))
-
-
 @app.put("/update-users")
 async def update_users(request: UpdateUsersRequest):
     user_ids = request.user_ids
     updated_fields = request.updated_fields
-    print(user_ids)
-    print(updated_fields)
     try:
-        for i in range(len(user_ids)):
-            # Check the length of user_ids as the entry fields that can be modified are different for a single select and multiselect
+        for i in range(len(user_ids)): # Check the length of user_ids as the entry fields that can be modified are different for a single select and multiselect
+
+            # Validate if only one organization_id has the "Premium User" tier
+            premium_user_count = sum(
+                1 for org_id in updated_fields["organization_id"]
+                if list(org_id.values())[0] == "Premium User"
+            )
+            if premium_user_count > 1:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Only one organization_id can have the 'Premium User' tier."
+                )
+            
             if len(user_ids) == 1:
                 # Update the users with the specified database_ids and updated fields
                 user = await platform_users.find_one({"_id": ObjectId(user_ids[i])})
                 # Update the user's profile fields
-                user["first_name"] = updated_fields["first_name"]
-                user["last_name"] = updated_fields["last_name"]
+                user["name"] = updated_fields["first_name"]
                 user["organization"] = updated_fields["organization"]
                 
                 # Compare the existing organization_id with the updated organization_id
@@ -747,7 +720,6 @@ async def update_users(request: UpdateUsersRequest):
                         user["organization_id"].append(org_id)
                 
                 print(user)
-                user["subscription_tier"] = updated_fields["subscription_tier"]
                 await platform_users.replace_one({"_id": ObjectId(user_ids[i])}, user)
             else:
                 user = await platform_users.find_one({"_id": ObjectId(user_ids[i])})
@@ -778,6 +750,8 @@ async def update_users(request: UpdateUsersRequest):
         return {"message": "User profile updated successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
 
 # Delete endpoint to delete a users
 @app.delete("/delete-users/")
@@ -830,26 +804,58 @@ async def list_team_users(owner: str):
     
 
 
-@app.put("/add-user")
-async def update_users(user_info: dict, admin_id: str):
-    admin = await platform_users.find_one({"_id": ObjectId(admin_id)})
-    user = await platform_users.find_one({"email": user_info["email"]})
-    
-    if user:
-        return user
-    else:
-        try:
+@app.put("/add-user/{email}")
+async def add_user(user_fields: dict, email: str):
+    # Retrieve the admin user based on the provided email
+    admin = await platform_users.find_one({"email": email})
+    user = await platform_users.find_one({"email": user_fields["email"]})
+    print(admin)
+    print(user)
+    # return {"message": "User added successfully"}
+    try:
+        if user:
+            print(1)
             # Update the user's profile fields
-            user_info["organization"] = admin["organization"]
-            user_info["organization_id"] = [
-                {admin["organization_id"][0]: user_info["subscription_tier"]}
-            ]
-            user_info["database_id"] = None
-            user_info["auth0_id"] = None
-            await platform_users.insert_one(user_info)
+            organization = user["organization"] if user["organization"] else admin["organization"]
+            database_id = user["database_id"] if user["database_id"] else None
+            auth0_id = user["auth0_id"] if user["auth0_id"] else None
+            
+            # Check if the user already has an organization_id array
+            if user["organization_id"]:
+                # Append the new value pair to the existing organization_id array
+                organization_id = user["organization_id"] + [{str(ObjectId()): user_fields["subscription_tier"]}]
+            else:
+                # Create a new organization_id array with the value pair
+                organization_id = [{str(ObjectId()): user_fields["subscription_tier"]}]
+            
+            new_user = {
+                "name": user_fields["name"],
+                "email": user_fields["email"],
+                "organization": organization,
+                "organization_id": organization_id,
+                "database_id": database_id,
+                "auth0_id": auth0_id
+            }
+            # Update the user in the database
+            await platform_users.update_one({"email": user_fields["email"]}, {"$set": new_user})
+            return {"message": "User updated successfully"}
+        else:
+            print(2)
+            new_user = {
+                "name": user_fields["name"],
+                "email": user_fields["email"],
+                "organization": admin["organization"],
+                "organization_id": admin["organization_id"] + [{str(ObjectId()): user_fields["subscription_tier"]}],
+                "database_id": None,
+                "auth0_id": None
+            }
+            # Insert the new user into the database
+            # print(new_user)
+            # await platform_users.insert_one(new_user)
             return {"message": "User added successfully"}
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 # @app.put("/update-users/")
 # async def update_users(request: UpdateUsersRequest):
