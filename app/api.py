@@ -765,63 +765,6 @@ async def delete_users(user_ids: List[str]):
 
 
 # # Route for geting for getting the team members associated with an organization.
-# @app.get(
-#     "/team/",
-#     response_description="List all users in the same organization",
-#     response_model=UsersCollection,
-#     response_model_by_alias=False,
-# )
-# async def list_team_users(owner: str):
-#     # Find the owner's document in the platform_users collection
-#     org_admin = await platform_users.find_one({"email": owner})
-#     print(owner)
-    
-#     if org_admin:
-#         # Retrieve the organization_id list of the owner
-#         owner_org_ids = org_admin["organization_id"]
-        
-#         # Find the organization_id key for which the value is "Premium User"
-#         premium_org_id = None
-#         for org_id_dict in owner_org_ids:
-#             for key, value in org_id_dict.items():
-#                 if value == "Premium User":
-#                     premium_org_id = key
-#                     break
-#             if premium_org_id:
-#                 break
-        
-#         if premium_org_id:
-#             # Query the platform_users collection to find all users with the premium_org_id in their organization_id list
-#             query = {"organization_id": {"$elemMatch": {premium_org_id: {"$exists": True}}}}
-#             users = await platform_users.find(query).to_list(None)
-            
-#             # Iterate over each user and modify the data to match the model
-#             for user in users:
-#                 user["database_id"] = str(user["_id"])
-                
-#                 # # Convert organization_id to a list of dictionaries
-#                 # user["organization_id"] = [
-#                 #     {key: str(value)} for org_id in user["organization_id"] for key, value in org_id.items()
-#                 # ]
-                
-#                     # Convert organization_id to a list of dictionaries
-#                 user["organization_id"] = [
-#                     {key: str(value[0]) if isinstance(value, list) else str(value)}
-#                     for org_id in user["organization_id"]
-#                     for key, value in org_id.items()
-#                 ]
-
-#                 # Ensure auth0_id is a string
-#                 user["auth0_id"] = str(user["auth0_id"]) if user["auth0_id"] else ""
-            
-#             print(users)
-#             return UsersCollection(users=users)
-#         else:
-#             # If no organization_id with value "Premium User" is found, return an empty list of users
-#             return UsersCollection(users=[])
-#     else:
-#         # If the owner is not found, return an empty list of users
-#         return UsersCollection(users=[])
 @app.get(
     "/team/",
     response_description="List all users in the same organization",
@@ -870,6 +813,7 @@ async def list_team_users(owner: str):
     else:
         # If the owner is not found, return an empty list of users
         return UsersCollection(users=[], premium_key=None)  # Set premium_key to None    
+
 
 
 # Route for adding users to project team
@@ -1014,8 +958,32 @@ async def update_users(updated_fields: dict, email: str):
 
 
 
-
-
+@app.post("/delete-users/{premiumKey}")
+async def remove_team_users(databaseIds: List[str], premiumKey: str):
+    print(databaseIds)
+    try:
+        for databaseId in databaseIds:
+            user = await platform_users.find_one({"_id": ObjectId(databaseId)})
+            if user:
+                # Remove the dictionary entry within organization_id that contains the premiumKey
+                user["organization_id"] = [
+                    org_id for org_id in user["organization_id"]
+                    if premiumKey not in org_id
+                ]
+                
+                # Update the user in the database
+                await platform_users.update_one(
+                    {"_id": ObjectId(databaseId)},
+                    {"$set": {"organization_id": user["organization_id"]}}
+                )
+                
+                print(f"Removed user with id {databaseId} from the team")
+            else:
+                print(f"User with id {databaseId} not found")
+        
+        return {"message": "Users removed from the team successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 
