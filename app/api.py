@@ -506,11 +506,11 @@ async def update_user_profile(project_info: Projects = Body(...)):
     response_model=AssignedSlatesCollection,
     response_model_by_alias=False,
 )
-async def list_slates(project: str, owner: str):
+async def list_slates(project: str, owner_org: str):
 # async def list_slates(owner: str):
     
     # query sets the conditions which it searches for in the forms collection
-    query = {"project": project, "owner": owner}
+    query = {"project": project, "owner_org": owner_org}
     # query = {"owner": owner}
     slates = await assigned_slates.find(query).to_list(None)
     # print(query)
@@ -546,7 +546,7 @@ async def edit_assigned_slate(slate_id: str, update: AssignSlateModel = Body(...
     try:        
         # Update the form data in the database
         assigned_slate["due_date"] = update.due_date
-        assigned_slate["owner"] = update.owner
+        assigned_slate["assignee"] = update.assignee
         assigned_slate["database_id"] = slate_id
         print(assigned_slate)
         await assigned_slates.replace_one({"_id": ObjectId(slate_id)}, assigned_slate)
