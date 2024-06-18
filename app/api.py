@@ -43,7 +43,6 @@ projects = db.get_collection("Projects")
 origins = [
     "http://localhost:3000",
     "localhost:3000", 
-    'https://www.polyglotplus.com',
     'https://www.sitesteer.ai'
 ]
 
