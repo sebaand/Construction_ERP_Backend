@@ -126,7 +126,7 @@ class FormField(BaseModel):
 class CreateSlateModel(BaseModel):
     title: str
     description: str
-    owner: str
+    owner_org: str
     last_updated: datetime
     status: bool
     fields: List[FormField]
@@ -138,7 +138,7 @@ class SlateTemplateModel(BaseModel):
     database_id: str
     title: str
     description: str
-    owner: str
+    owner_org: str
     last_updated: datetime
     status: bool
     fields: List[FormField]
@@ -153,7 +153,8 @@ class AssignSlateModel(BaseModel):
     description: str
     due_date: datetime
     assigned_date: datetime
-    owner: str
+    assignee: str
+    owner_org: str
     last_updated: datetime
     status: bool
     fields: List[FormField]
@@ -166,7 +167,8 @@ class SubmitSlateModel(BaseModel):
     title: str
     description: str
     project: str
-    owner: str
+    assignee: str
+    owner_org: str
     last_updated: datetime
     status: bool
     fields: List[FormField]
@@ -200,6 +202,9 @@ async def read_root() -> dict:
     return {"message": "Welcome!."}
 
 
+# # # # # # # # # # # # # # # # # # Retrieve User Data Routes # # # # # # # # # # # # # # # # # # # # # #
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
+
 
 # Route for geting for getting the logged in user's profile
 @app.get("/user-profile/{auth0_id}", response_model=Optional[PlatformUsers])
@@ -217,6 +222,42 @@ async def get_user_profile(auth0_id: str):
         raise HTTPException(status_code=500, detail="Internal Server Error")
     
 
+class UserData(BaseModel):
+    is_premium_user: bool
+    premium_key: Optional[str] = None
+
+
+@app.get("/user-data/", response_model=UserData)
+async def get_user_data(email: str = Query(...)):
+    # Find the user document in the platform_users collection based on the email
+    user = await platform_users.find_one({"email": email})
+    print('email: ',email)
+    print('user: ',user)
+    if user:
+        # Retrieve the organization_id list of the user
+        user_org_ids = user["organization_id"]
+
+        # Find the organization_id key for which the value is "Premium User"
+        premium_org_id = None
+        for org_id_dict in user_org_ids:
+            for key, value in org_id_dict.items():
+                if value == "Premium User":
+                    premium_org_id = key
+                    break
+            if premium_org_id:
+                break
+        print(premium_org_id)
+        if premium_org_id:
+            # If the user has a "Premium User" value, return True and the corresponding key
+            return UserData(is_premium_user=True, premium_key=premium_org_id)
+        else:
+            # If the user doesn't have a "Premium User" value, return False and None for the key
+            return UserData(is_premium_user=False)
+    else:
+        # If the user is not found, return False and None for the key
+        return UserData(is_premium_user=False)
+    
+
 # # # # # # # # # # # # # # # # # # Slate Related Routes # # # # # # # # # # # # # # # # # # # # # # # #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
 
@@ -228,7 +269,7 @@ async def get_user_profile(auth0_id: str):
     response_model=TemplateCollection,
     response_model_by_alias=False,
 )
-async def list_forms(owner: str, status: str):
+async def list_forms(owner_org: str, status: str):
     """
     List all of the data in the database that match the given organization and email.
     The response is unpaginated and limited to 1000 results.
@@ -238,7 +279,7 @@ async def list_forms(owner: str, status: str):
     status_bool = status.lower() == 'true'
     
      # query sets the conditions which it searches for in the forms collection
-    query = {"owner": owner, "status": status_bool}
+    query = {"owner_org": owner_org, "status": status_bool}
     forms = await templates.find(query).to_list(10000)
 
     # Iterate over each form and store its _id in the dictionary
@@ -258,10 +299,10 @@ async def list_forms(owner: str, status: str):
     response_model=AssignedSlatesCollection,
     response_model_by_alias=False,
 )
-async def list_slates(owner: str, status: bool):
+async def list_slates(assignee: str, status: bool):
     
     # query sets the conditions which it searches for in the forms collection
-    query = {"owner": owner, "status": status}
+    query = {"assignee": assignee, "status": status}
     slates = await assigned_slates.find(query).to_list(10000)
     # print(query)
 
