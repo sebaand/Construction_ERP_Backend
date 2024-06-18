@@ -43,12 +43,11 @@ projects = db.get_collection("Projects")
 origins = [
     "http://localhost:3000",
     "localhost:3000", 
-    'https://www.sitesteer.ai'
+    "https://www.sitesteer.ai", 
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    # allow_origins=['https://www.polyglotplus.com'],
     allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
