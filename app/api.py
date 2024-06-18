@@ -189,6 +189,7 @@ class AssignedSlatesCollection(BaseModel):
 
 class UsersCollection(BaseModel):
     users: List[PlatformUsers]
+    premium_key: Optional[str] = None
 
 
 class SlatesCollection(BaseModel):
@@ -763,7 +764,64 @@ async def delete_users(user_ids: List[str]):
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
 
 
-# Route for geting for getting the team members associated with an organization.
+# # Route for geting for getting the team members associated with an organization.
+# @app.get(
+#     "/team/",
+#     response_description="List all users in the same organization",
+#     response_model=UsersCollection,
+#     response_model_by_alias=False,
+# )
+# async def list_team_users(owner: str):
+#     # Find the owner's document in the platform_users collection
+#     org_admin = await platform_users.find_one({"email": owner})
+#     print(owner)
+    
+#     if org_admin:
+#         # Retrieve the organization_id list of the owner
+#         owner_org_ids = org_admin["organization_id"]
+        
+#         # Find the organization_id key for which the value is "Premium User"
+#         premium_org_id = None
+#         for org_id_dict in owner_org_ids:
+#             for key, value in org_id_dict.items():
+#                 if value == "Premium User":
+#                     premium_org_id = key
+#                     break
+#             if premium_org_id:
+#                 break
+        
+#         if premium_org_id:
+#             # Query the platform_users collection to find all users with the premium_org_id in their organization_id list
+#             query = {"organization_id": {"$elemMatch": {premium_org_id: {"$exists": True}}}}
+#             users = await platform_users.find(query).to_list(None)
+            
+#             # Iterate over each user and modify the data to match the model
+#             for user in users:
+#                 user["database_id"] = str(user["_id"])
+                
+#                 # # Convert organization_id to a list of dictionaries
+#                 # user["organization_id"] = [
+#                 #     {key: str(value)} for org_id in user["organization_id"] for key, value in org_id.items()
+#                 # ]
+                
+#                     # Convert organization_id to a list of dictionaries
+#                 user["organization_id"] = [
+#                     {key: str(value[0]) if isinstance(value, list) else str(value)}
+#                     for org_id in user["organization_id"]
+#                     for key, value in org_id.items()
+#                 ]
+
+#                 # Ensure auth0_id is a string
+#                 user["auth0_id"] = str(user["auth0_id"]) if user["auth0_id"] else ""
+            
+#             print(users)
+#             return UsersCollection(users=users)
+#         else:
+#             # If no organization_id with value "Premium User" is found, return an empty list of users
+#             return UsersCollection(users=[])
+#     else:
+#         # If the owner is not found, return an empty list of users
+#         return UsersCollection(users=[])
 @app.get(
     "/team/",
     response_description="List all users in the same organization",
@@ -797,94 +855,24 @@ async def list_team_users(owner: str):
             # Iterate over each user and modify the data to match the model
             for user in users:
                 user["database_id"] = str(user["_id"])
-                
-                # # Convert organization_id to a list of dictionaries
-                # user["organization_id"] = [
-                #     {key: str(value)} for org_id in user["organization_id"] for key, value in org_id.items()
-                # ]
-                
-                    # Convert organization_id to a list of dictionaries
                 user["organization_id"] = [
                     {key: str(value[0]) if isinstance(value, list) else str(value)}
                     for org_id in user["organization_id"]
                     for key, value in org_id.items()
                 ]
-
-                # Ensure auth0_id is a string
                 user["auth0_id"] = str(user["auth0_id"]) if user["auth0_id"] else ""
             
             print(users)
-            return UsersCollection(users=users)
+            return UsersCollection(users=users, premium_key=premium_org_id)  # Include premium_key in the response
         else:
             # If no organization_id with value "Premium User" is found, return an empty list of users
-            return UsersCollection(users=[])
+            return UsersCollection(users=[], premium_key=None)  # Set premium_key to None
     else:
         # If the owner is not found, return an empty list of users
-        return UsersCollection(users=[])
-    
+        return UsersCollection(users=[], premium_key=None)  # Set premium_key to None    
 
 
-# @app.put("/add-user/{email}")
-# async def add_user(user_fields: dict, email: str):
-#     # Retrieve the admin user based on the provided email
-#     admin = await platform_users.find_one({"email": email})
-#     user = await platform_users.find_one({"email": user_fields["email"]})
-#     print(user_fields)
-
-#     if not admin:
-#         raise HTTPException(status_code=404, detail="Admin user not found")
-
-#     try:
-#         if user:
-#             print(1)
-#             # Update the user's profile fields
-#             organization = user.get("organization", admin["organization"])
-#             database_id = user.get("database_id")
-#             auth0_id = user.get("auth0_id")
-
-#             # Check if the user already has an organization_id array
-#             if user.get("organization_id"):
-#                 # Append the new value pair to the existing organization_id array
-#                 organization_id = user["organization_id"]
-#                 # Update the subscription tier for the existing key
-#                 for item in organization_id:
-#                     key = list(item.keys())[0]
-#                     if key == list(admin["organization_id"][0].keys())[0]:
-#                         item[key] = user_fields["organization_id"]
-#                         break
-#             else:
-#                 # Create a new organization_id array with the value pair using the admin's key
-#                 admin_key = list(admin["organization_id"][0].keys())[0]
-#                 organization_id = [{admin_key: user_fields["organization_id"]}]
-
-#             new_user = {
-#                 "name": user_fields["name"],
-#                 "email": user_fields["email"],
-#                 "organization": organization,
-#                 "organization_id": organization_id,
-#                 "database_id": database_id,
-#                 "auth0_id": auth0_id
-#             }
-#             # Update the user in the database
-#             await platform_users.update_one({"email": user_fields["email"]}, {"$set": new_user})
-#             return {"message": "User updated successfully"}
-#         else:
-#             # Get the key from the admin's organization_id
-#             admin_key = list(admin["organization_id"][0].keys())[0]
-#             print(admin_key)
-#             new_user = {
-#                 "name": user_fields["name"],
-#                 "email": user_fields["email"],
-#                 "organization": admin["organization"],
-#                 "organization_id": [{admin_key: user_fields["organization_id"]}],
-#                 "database_id": None,
-#                 "auth0_id": None
-#             }
-#             # Insert the new user into the database
-#             await platform_users.insert_one(new_user)
-#             return {"message": "User added successfully"}
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=str(e))
+# Route for adding users to project team
 @app.put("/add-user/{email}")
 async def add_user(user_fields: dict, email: str):
     # Retrieve the admin user based on the provided email
@@ -958,11 +946,71 @@ async def add_user(user_fields: dict, email: str):
 
 
 
-
-
-
-
-
+# Route for updating team members info
+@app.put("/update-team-users/{email}")
+async def update_users(updated_fields: dict, email: str):
+    # Retrieve the admin user based on the provided email
+    admin = await platform_users.find_one({"email": email})
+    
+    # Find the key associated with the "Premium User" tier in the admin's organization_id
+    premium_key = None
+    for org_id in admin["organization_id"]:
+        for key, value in org_id.items():
+            if value == "Premium User":
+                premium_key = key
+                break
+        if premium_key:
+            break
+    
+    print('premium_key: ', premium_key)
+    print('admin: ', admin)
+    print('updated_fields: ', updated_fields)
+    
+    try:
+        # Check if the user with the specified email exists
+        user = await platform_users.find_one({"email": updated_fields["email"]})
+        
+        # If user exists, update the user's profile fields
+        if user:
+            print(1)
+            user["name"] = updated_fields["name"]
+            
+            # Update the subscription tier for the user based on the premium key
+            for org_id in user["organization_id"]:
+                print('org_id:', org_id)
+                if premium_key in org_id:
+                    org_id[premium_key] = updated_fields["organization_id"][0]
+                    break
+            else:
+                # If the premium key doesn't exist, add a new key-value pair
+                user["organization_id"].append({premium_key: updated_fields["organization_id"][0]})
+            
+            await platform_users.update_one({"email": updated_fields["email"]}, {"$set": user})
+            return {"message": "User profile updated successfully"}
+        
+        # If user doesn't exist, create a new user
+        else:
+            new_user = {
+                "email": updated_fields["email"],
+                "name": updated_fields["name"],
+                "organization": admin["organization"],
+                "organization_id": {premium_key: updated_fields["organization_id"][0]},
+                "database_id": None,
+                "auth0_id": None
+            }
+            
+            # Convert organization_id to a list of dictionaries
+            new_user["organization_id"] = [
+                {key: str(value[0]) if isinstance(value, list) else str(value)}
+                for org_id in [new_user["organization_id"]]
+                for key, value in org_id.items()
+            ]
+            
+            await platform_users.insert_one(new_user)
+            return {"message": "User profile added successfully"}
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 
