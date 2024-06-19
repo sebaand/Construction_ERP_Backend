@@ -92,12 +92,12 @@ class TableColumn(BaseModel):
     dataType: str  # Data type of the column (e.g., 'text', 'number', 'date', etc.)
     required: Optional[bool] = False
 
-    @validator('dataType')
-    def validate_data_type(cls, v):
-        allowed_types = ["text", "number", "decimal", "date", "signature", "colour"]
-        if v not in allowed_types:
-            raise ValueError(f"dataType must be one of {allowed_types}")
-        return v
+    # @validator('dataType')
+    # def validate_data_type(cls, v):
+    #     allowed_types = ["text", "number", "decimal", "date", "signature", "colour"]
+    #     if v not in allowed_types:
+    #         raise ValueError(f"dataType must be one of {allowed_types}")
+    #     return v
 
 
 # FormField now only holds metadata about each form field
@@ -114,12 +114,12 @@ class FormField(BaseModel):
     max_value: Optional[Union[int, float]] = None  # Max value for number fields
     columns: Optional[List[TableColumn]] = None  # List of columns for table fields
 
-    @validator('field_type')
-    def validate_field_type(cls, v):
-        allowed_types = ["text", "number", "decimal", "email", "date", "signature","table","table-column","select", "checkbox", "radio", "dropdown","description", "section_break"]
-        if v not in allowed_types:
-            raise ValueError(f"field_type must be one of {allowed_types}")
-        return v
+    # @validator('field_type')
+    # def validate_field_type(cls, v):
+    #     allowed_types = ["text", "number", "decimal", "email", "date", "signature","table","table-column","select", "checkbox", "radio", "dropdown","description", "section_break"]
+    #     if v not in allowed_types:
+    #         raise ValueError(f"field_type must be one of {allowed_types}")
+    #     return v
 
 
 # # FormModel now contains a list of Slate Fields and a dictionary for the form data
@@ -163,16 +163,20 @@ class AssignSlateModel(BaseModel):
 
 # # SubmitSlateModel defines the model structure for the slates once they're assigned to a user
 class SubmitSlateModel(BaseModel):
-    id: str
-    title: str
-    description: str
-    project: str
+    assigned_date: datetime
     assignee: str
-    owner_org: str
-    last_updated: datetime
-    status: bool
-    fields: List[FormField]
     data: Dict[str, Any]  # Holds the dynamic values for each field named by 'name' in FormFields
+    database_id: str
+    description: str
+    due_date: datetime
+    fields: List[FormField]
+    last_updated: datetime
+    owner_org: str
+    title: str
+    project: str
+    status: bool
+    
+    
 
 
 class TemplateCollection(BaseModel):
@@ -309,7 +313,7 @@ async def list_slates(assignee: str, status: bool):
     # Iterate over each form and store its _id in the dictionary
     for i,form in enumerate(slates):
         form_id = str(form["_id"])
-        form["id"] =  form_id # Add the index to the form data
+        form["database_id"] =  form_id # Add the index to the form data
     print("slates:")
     print(slates)
     return AssignedSlatesCollection(slates=slates)
@@ -343,7 +347,7 @@ async def assign_slate(slate: AssignSlateModel = Body(...)):
 
 
 # PUT endpoint to update the form data
-@app.put("/submit-form/{form_id}")
+@app.put("/submit-slate/{form_id}")
 async def update_form(form_id: str, slate: SubmitSlateModel = Body(...)):
     # print('Received Form Data:', form)
     print('form_id', form_id)
@@ -362,7 +366,7 @@ async def update_form(form_id: str, slate: SubmitSlateModel = Body(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-
+# PUT endpoint to update the form data
 @app.put("/update-slate/{templateId}")
 async def update_form(templateId: str, slate: CreateSlateModel = Body(...)):
     print("Received Slate Data:", slate)
