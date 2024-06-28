@@ -1,11 +1,18 @@
-from fastapi import FastAPI, HTTPException, Body, Request, Query
+from fastapi import FastAPI, HTTPException, Body, Request, Query, File
+from starlette.datastructures import UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field, EmailStr, validator
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field, EmailStr
 from typing import List, Optional, Union, Any, Dict
 from datetime import date, datetime
 from typing_extensions import Annotated
 from bson import ObjectId
 import motor.motor_asyncio
+import boto3
+from botocore.exceptions import NoCredentialsError
+import os
+import uuid
 
 # imports for pdf generation
 from fastapi.responses import StreamingResponse
@@ -19,13 +26,17 @@ import requests
 from jose import jwt
 import os
 
+# Specify the directory to save images
+UPLOAD_DIRECTORY = "uploaded_images"
+
+# Ensure the upload directory exists
+os.makedirs(UPLOAD_DIRECTORY, exist_ok=True)
+
 app = FastAPI()
 
-# Your Auth0 M2M application's client ID and client secret
+# Your Auth0 M2M application's client ID, client secret and domain
 AUTH0_CLIENT_ID = os.getenv('AUTH0_CLIENT_ID')
 AUTH0_CLIENT_SECRET = os.getenv('AUTH0_CLIENT_SECRET')
-
-# Your Auth0 domain
 AUTH0_DOMAIN = os.getenv('AUTH0_DOMAIN')
 
 # MongoDB Database and Collections Declaration
@@ -38,6 +49,21 @@ assigned_slates = db.get_collection("Assigned_Slates")
 early_birds = db.get_collection("Early_Birds")
 templates = db.get_collection("Templates")
 projects = db.get_collection("Projects")
+
+
+# Configure Digital Ocean Spaces credentials
+DO_SPACE_REGION = os.getenv('DO_SPACE_REGION')
+DO_SPACE_NAME = os.getenv('DO_SPACE_NAME')
+DO_ACCESS_KEY = os.getenv('DO_ACCESS_KEY')
+DO_SECRET_KEY = os.getenv('DO_SECRET_KEY')
+DO_ENDPOINT_URL = os.getenv('DO_ENDPOINT_URL')
+
+spaces_client = boto3.client('s3',
+    region_name=DO_SPACE_REGION,
+    endpoint_url=DO_ENDPOINT_URL,
+    aws_access_key_id=DO_ACCESS_KEY,
+    aws_secret_access_key=DO_SECRET_KEY
+)
 
 # Origins for local deployment during development stage. 
 origins = [
@@ -75,6 +101,7 @@ class PlatformUsers(BaseModel):
     organization_id: List[Dict[str, str]] = None
     email: str
     auth0_id: Optional[str]
+
 
 # Class for defining the model of the key data on an early_bird adoption
 class EarlyBird(BaseModel):
@@ -174,9 +201,7 @@ class SubmitSlateModel(BaseModel):
     owner_org: str
     title: str
     project: str
-    status: bool
-    
-    
+    status: bool    
 
 
 class TemplateCollection(BaseModel):
@@ -346,24 +371,97 @@ async def assign_slate(slate: AssignSlateModel = Body(...)):
     
 
 
-# PUT endpoint to update the form data
 @app.put("/submit-slate/{form_id}")
-async def update_form(form_id: str, slate: SubmitSlateModel = Body(...)):
-    # print('Received Form Data:', form)
-    print('form_id', form_id)
+# async def update_form(request: Request, form_id: str):
+#     try:
+#         form = await request.form()
+#         json_data = json.loads(form["json"])
+        
+#         files = form.getlist("files")
+        
+#         filename_mapping = {}
+        
+#         for file in files:
+#             if isinstance(file, UploadFile):
+#                 original_filename = file.filename
+#                 unique_filename = f"{uuid.uuid4()}_{original_filename}"
+#                 filename_mapping[original_filename] = unique_filename
+                
+#                 filepath = os.path.join(UPLOAD_DIRECTORY, unique_filename)
+                
+#                 contents = await file.read()
+#                 with open(filepath, "wb") as f:
+#                     f.write(contents)
+        
+#         # Update JSON data with new filenames
+#         for field_name, field_value in json_data['data'].items():
+#             if isinstance(field_value, list):
+#                 for item in field_value:
+#                     for key, value in item.items():
+#                         if value in filename_mapping:
+#                             item[key] = filename_mapping[value]
+
+
+#         # Update MongoDB
+#         update_result = await assigned_slates.update_one(
+#             {"_id": ObjectId(form_id)},
+#             {"$set": json_data}
+#         )
+        
+#         if update_result.modified_count == 0:
+#             return JSONResponse(status_code=404, content={"message": "Form not found or not modified"})
+        
+#         return JSONResponse(content={"message": "Form updated successfully", "data": json_data})
+#     except Exception as e:
+#         print(f"Error: {str(e)}")
+#         return JSONResponse(status_code=500, content={"error": str(e)})
+@app.put("/submit-slate/{form_id}")
+async def update_form(request: Request, form_id: str):
     try:
-        # Convert the form data to a dictionary
-        slate_dict = slate.model_dump(by_alias=True)
+        form = await request.form()
+        json_data = json.loads(form["json"])
         
-        # Update the form data in the database
-        update_result = await assigned_slates.update_one({"_id": ObjectId(form_id)}, {"$set": slate_dict})
+        files = form.getlist("files")
         
-        if update_result.modified_count == 1:
-            return {"message": "Slate data updated successfully"}
-        else:
-            raise HTTPException(status_code=404, detail="Slate not found")
+        filename_mapping = {}
+        
+        for file in files:
+            if isinstance(file, UploadFile):
+                original_filename = file.filename
+                unique_filename = f"{uuid.uuid4()}_{original_filename}"
+                filename_mapping[original_filename] = unique_filename
+                
+                contents = await file.read()
+                
+                # Upload file to Digital Ocean Spaces
+                spaces_client.put_object(
+                    Bucket=DO_SPACE_NAME,
+                    Key=unique_filename,
+                    Body=contents,
+                    ACL='public-read'
+                )
+        
+        # Update JSON data with new filenames
+        for field_name, field_value in json_data['data'].items():
+            if isinstance(field_value, list):
+                for item in field_value:
+                    for key, value in item.items():
+                        if value in filename_mapping:
+                            item[key] = f"https://{DO_SPACE_NAME}.{DO_SPACE_REGION}.digitaloceanspaces.com/{filename_mapping[value]}"
+
+        # Update MongoDB
+        update_result = await assigned_slates.update_one(
+            {"_id": ObjectId(form_id)},
+            {"$set": json_data}
+        )
+        
+        if update_result.modified_count == 0:
+            return JSONResponse(status_code=404, content={"message": "Form not found or not modified"})
+        
+        return JSONResponse(content={"message": "Form updated successfully", "data": json_data})
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error: {str(e)}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
 
 # PUT endpoint to update the form data
@@ -401,6 +499,8 @@ async def delete_slate(slate_id: str):
             raise HTTPException(status_code=404, detail="Slate template not found")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
 
 
 # # # # # # # # # # # # # # # # # # Project Related Routes # # # # # # # # # # # # # # # # # # # # # # # # 
