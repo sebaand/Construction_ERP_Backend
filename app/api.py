@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Body, Request, Query, File
+from fastapi import FastAPI, HTTPException, Body, Request, Query, File, Response
 from starlette.datastructures import UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.encoders import jsonable_encoder
@@ -88,6 +88,7 @@ class Projects(BaseModel):
     currency: str
     status: str
     projectName: str
+    projectId: str
     projectType: str  
     projectLead: str
     estimated_date: datetime
@@ -119,13 +120,6 @@ class TableColumn(BaseModel):
     dataType: str  # Data type of the column (e.g., 'text', 'number', 'date', etc.)
     required: Optional[bool] = False
 
-    # @validator('dataType')
-    # def validate_data_type(cls, v):
-    #     allowed_types = ["text", "number", "decimal", "date", "signature", "colour"]
-    #     if v not in allowed_types:
-    #         raise ValueError(f"dataType must be one of {allowed_types}")
-    #     return v
-
 
 # FormField now only holds metadata about each form field
 class FormField(BaseModel):
@@ -140,13 +134,6 @@ class FormField(BaseModel):
     min_value: Optional[Union[int, float]] = None  # Min value for number fields
     max_value: Optional[Union[int, float]] = None  # Max value for number fields
     columns: Optional[List[TableColumn]] = None  # List of columns for table fields
-
-    # @validator('field_type')
-    # def validate_field_type(cls, v):
-    #     allowed_types = ["text", "number", "decimal", "email", "date", "signature","table","table-column","select", "checkbox", "radio", "dropdown","description", "section_break"]
-    #     if v not in allowed_types:
-    #         raise ValueError(f"field_type must be one of {allowed_types}")
-    #     return v
 
 
 # # FormModel now contains a list of Slate Fields and a dictionary for the form data
@@ -176,7 +163,7 @@ class SlateTemplateModel(BaseModel):
 class AssignSlateModel(BaseModel):
     database_id: Optional[str]
     title: str
-    project: str
+    projectId: str
     description: str
     due_date: datetime
     assigned_date: datetime
@@ -201,7 +188,22 @@ class SubmitSlateModel(BaseModel):
     owner_org: str
     title: str
     project: str
-    status: bool    
+    status: bool
+
+
+class DashboardItem(BaseModel):
+    id: str
+    project_name: str
+    project_type: str
+    slate_name: str
+    status: str
+    assignee_name: str
+    assignee_email: str
+    assigned_date: datetime
+    due_date: datetime
+    description: str
+    owner_org: str
+    last_updated: datetime       
 
 
 class TemplateCollection(BaseModel):
@@ -371,7 +373,7 @@ async def assign_slate(slate: AssignSlateModel = Body(...)):
     
 
 
-@app.put("/submit-slate/{form_id}")
+# @app.put("/submit-slate/{form_id}")
 # async def update_form(request: Request, form_id: str):
 #     try:
 #         form = await request.form()
@@ -415,6 +417,53 @@ async def assign_slate(slate: AssignSlateModel = Body(...)):
 #     except Exception as e:
 #         print(f"Error: {str(e)}")
 #         return JSONResponse(status_code=500, content={"error": str(e)})
+# @app.put("/submit-slate/{form_id}")
+# async def update_form(request: Request, form_id: str):
+#     try:
+#         form = await request.form()
+#         json_data = json.loads(form["json"])
+        
+#         files = form.getlist("files")
+        
+#         filename_mapping = {}
+        
+#         for file in files:
+#             if isinstance(file, UploadFile):
+#                 original_filename = file.filename
+#                 unique_filename = f"{uuid.uuid4()}_{original_filename}"
+#                 filename_mapping[original_filename] = unique_filename
+                
+#                 contents = await file.read()
+                
+#                 # Upload file to Digital Ocean Spaces
+#                 spaces_client.put_object(
+#                     Bucket=DO_SPACE_NAME,
+#                     Key=unique_filename,
+#                     Body=contents,
+#                     ACL='public-read'
+#                 )
+        
+#         # Update JSON data with new filenames
+#         for field_name, field_value in json_data['data'].items():
+#             if isinstance(field_value, list):
+#                 for item in field_value:
+#                     for key, value in item.items():
+#                         if value in filename_mapping:
+#                             item[key] = f"https://{DO_SPACE_NAME}.{DO_SPACE_REGION}.digitaloceanspaces.com/{filename_mapping[value]}"
+
+#         # Update MongoDB
+#         update_result = await assigned_slates.update_one(
+#             {"_id": ObjectId(form_id)},
+#             {"$set": json_data}
+#         )
+        
+#         if update_result.modified_count == 0:
+#             return JSONResponse(status_code=404, content={"message": "Form not found or not modified"})
+        
+#         return JSONResponse(content={"message": "Form updated successfully", "data": json_data})
+#     except Exception as e:
+#         print(f"Error: {str(e)}")
+#         return JSONResponse(status_code=500, content={"error": str(e)})
 @app.put("/submit-slate/{form_id}")
 async def update_form(request: Request, form_id: str):
     try:
@@ -438,16 +487,16 @@ async def update_form(request: Request, form_id: str):
                     Bucket=DO_SPACE_NAME,
                     Key=unique_filename,
                     Body=contents,
-                    ACL='public-read'
+                    ACL='private'  # Ensure the file is private
                 )
         
-        # Update JSON data with new filenames
+        # Update JSON data with file keys (not full URLs)
         for field_name, field_value in json_data['data'].items():
             if isinstance(field_value, list):
                 for item in field_value:
                     for key, value in item.items():
                         if value in filename_mapping:
-                            item[key] = f"https://{DO_SPACE_NAME}.{DO_SPACE_REGION}.digitaloceanspaces.com/{filename_mapping[value]}"
+                            item[key] = filename_mapping[value]  # Store just the file key
 
         # Update MongoDB
         update_result = await assigned_slates.update_one(
@@ -462,6 +511,25 @@ async def update_form(request: Request, form_id: str):
     except Exception as e:
         print(f"Error: {str(e)}")
         return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+
+# Endpoint to retrieve file content
+@app.get("/get-file/{file_key}")
+async def get_file(file_key: str):
+    try:
+        # Retrieve the file from Digital Ocean Spaces
+        file_obj = spaces_client.get_object(Bucket=DO_SPACE_NAME, Key=file_key)
+        file_content = file_obj['Body'].read()
+        
+        # Determine the content type (you might want to store this information when uploading)
+        content_type = file_obj['ContentType']
+        
+        # Return the file content
+        return Response(content=file_content, media_type=content_type)
+    except Exception as e:
+        raise HTTPException(status_code=404, detail="File not found")
+
 
 
 # PUT endpoint to update the form data
@@ -502,6 +570,30 @@ async def delete_slate(slate_id: str):
 
 
 
+# # # # # # # # # # # # # # # # # # Org Related Routes # # # # # # # # # # # # # # # # # # # # # # # # 
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+@app.get(
+    "/org-slates/",
+    response_description="List all slates of an organization",
+    response_model=AssignedSlatesCollection,
+    response_model_by_alias=False,
+)
+async def list_slates(owner_org: str):
+# async def list_slates(owner: str):
+    
+    # query sets the conditions which it searches for in the forms collection
+    query = {"owner_org": owner_org}
+    slates = await assigned_slates.find(query).to_list(None)
+    # print(query)
+
+    # Iterate over each form and store its _id in the dictionary
+    for i,form in enumerate(slates):
+        form_id = str(form["_id"])
+        form["database_id"] =  form_id # Add the index to the form data
+
+    return AssignedSlatesCollection(slates=slates)
+
 
 # # # # # # # # # # # # # # # # # # Project Related Routes # # # # # # # # # # # # # # # # # # # # # # # # 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -512,6 +604,7 @@ async def delete_slate(slate_id: str):
 async def create_project(project: Projects = Body(...)):
     try:
         project_dict = project.model_dump(by_alias=True)  # Convert to dict, respecting field aliases if any
+        project_dict["projectId"] = str(uuid.uuid4())
         insert_result = await projects.insert_one(project_dict)
         return {"message": "project created successfully", "id": str(insert_result.inserted_id)}
     except Exception as e:
@@ -537,7 +630,6 @@ async def list_projects(owner: str):
         form_id = str(form["_id"])
         form["database_id"] =  form_id # Add the index to the form data
         
-    
     return ProjectsCollection(user_projects=user_projects)
 
 
@@ -610,11 +702,11 @@ async def update_user_profile(project_info: Projects = Body(...)):
     response_model=AssignedSlatesCollection,
     response_model_by_alias=False,
 )
-async def list_slates(project: str, owner_org: str):
+async def list_slates(projectId: str, owner_org: str):
 # async def list_slates(owner: str):
     
     # query sets the conditions which it searches for in the forms collection
-    query = {"project": project, "owner_org": owner_org}
+    query = {"projectId": projectId, "owner_org": owner_org}
     # query = {"owner": owner}
     slates = await assigned_slates.find(query).to_list(None)
     # print(query)
@@ -1129,6 +1221,106 @@ async def remove_team_users(databaseIds: List[str], premiumKey: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# # # # # # # # # # # # # # # # # # Dashboard Routes # # # # # # # # # # # # # # # # # # # # # # # # # # # 
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
+
+
+# @app.get("/dashboard-data")
+# async def get_dashboard_data(owner_org: str = Query(..., description="Organization ID to filter slates")):
+#     print('owner_org:', owner_org)
+#     debug_pipeline = [
+#         {"$match": {"owner_org": owner_org}},
+#         {"$lookup": {
+#             "from": "Projects",
+#             "localField": "projectId",
+#             "foreignField": "projectId",
+#             "as": "project_info"
+#         }},
+#         {"$unwind": {
+#             "path": "$project_info",
+#             "preserveNullAndEmptyArrays": True
+#         }},
+#         {"$lookup": {
+#             "from": "Users",
+#             "localField": "assignee",
+#             "foreignField": "email",
+#             "as": "user_info"
+#         }},
+#         {"$unwind": {
+#             "path": "$user_info",
+#             "preserveNullAndEmptyArrays": True
+#         }},
+#         {"$project": {
+#             "id": "$database_id",
+#             "project_name": "$project_info.projectName",
+#             "project_type": "$project_info.projectType",
+#             "slate_name": "$title",
+#             "status": {"$cond": ["$status", "Completed", "Active"]},
+#             "assignee_name": "$user_info.name",
+#             "assignee_email": "$assignee",
+#             "assigned_date": "$assigned_date",
+#             "due_date": "$due_date",
+#             "description": "$description",
+#             "owner_org": "$owner_org",
+#             "last_updated": "$last_updated"
+#         }},
+#         {"$limit": 5} 
+#     ]
+
+#     debug_result = await db.Assigned_Slates.aggregate(debug_pipeline).to_list(None)
+#     print("Debug result:", debug_result)
+#     count_pipeline = [
+#     {"$match": {"owner_org": owner_org}},
+#     {"$count": "matching_documents"}
+#     ]
+#     count_result = await db.Assigned_Slates.aggregate(count_pipeline).to_list(None)
+#     print("Count after match:", count_result)
+@app.get("/dashboard-data", response_model=List[DashboardItem])
+async def get_dashboard_data(owner_org: str = Query(..., description="Organization ID to filter slates")):
+    pipeline = [
+        {"$match": {"owner_org": owner_org}},
+        {"$lookup": {
+            "from": "Projects",
+            "localField": "projectId",
+            "foreignField": "projectId",
+            "as": "project_info"
+        }},
+        {"$unwind": {
+            "path": "$project_info",
+            "preserveNullAndEmptyArrays": True
+        }},
+        {"$lookup": {
+            "from": "Users",
+            "localField": "assignee",
+            "foreignField": "email",
+            "as": "user_info"
+        }},
+        {"$unwind": {
+            "path": "$user_info",
+            "preserveNullAndEmptyArrays": True
+        }},
+        {"$project": {
+            "id": {"$toString": "$_id"},
+            "project_name": "$project_info.projectName",
+            "project_type": "$project_info.projectType",
+            "slate_name": "$title",
+            "status": {"$cond": ["$status", "Completed", "Active"]},
+            "assignee_name": "$user_info.name",
+            "assignee_email": "$assignee",
+            "assigned_date": "$assigned_date",
+            "due_date": "$due_date",
+            "description": "$description",
+            "owner_org": "$owner_org",
+            "last_updated": "$last_updated"
+        }}
+    ]
+    
+    try:
+        result = await db.Assigned_Slates.aggregate(pipeline).to_list(None)
+        print(result)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # @app.put("/update-users/")
