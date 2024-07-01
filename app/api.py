@@ -1,18 +1,26 @@
-from fastapi import FastAPI, HTTPException, Body, Request, Query, File, Response
+from fastapi import FastAPI, HTTPException, Body, Request, Query, Response, File
 from starlette.datastructures import UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, EmailStr
 from typing import List, Optional, Union, Any, Dict
-from datetime import date, datetime
+from datetime import datetime, timedelta
 from typing_extensions import Annotated
 from bson import ObjectId
 import motor.motor_asyncio
 import boto3
 from botocore.exceptions import NoCredentialsError
+from botocore.exceptions import ClientError
 import os
 import uuid
+import io
+
+# imports for the scheduling of the background calculations
+from contextlib import asynccontextmanager
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
+
 
 # imports for pdf generation
 from fastapi.responses import StreamingResponse
@@ -49,6 +57,7 @@ assigned_slates = db.get_collection("Assigned_Slates")
 early_birds = db.get_collection("Early_Birds")
 templates = db.get_collection("Templates")
 projects = db.get_collection("Projects")
+org_metrics = db.get_collection("OrganizationMetrics")
 
 
 # Configure Digital Ocean Spaces credentials
@@ -65,6 +74,77 @@ spaces_client = boto3.client('s3',
     aws_secret_access_key=DO_SECRET_KEY
 )
 
+# async def calculate_and_store_metrics():    
+#     current_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    
+#     # Get all unique owner_orgs
+#     owner_orgs = db.Assigned_Slates.distinct("owner_org")
+    
+#     for owner_org in owner_orgs:
+#         # Calculate project health
+#         total_slates = db.Assigned_Slates.count_documents({"owner_org": owner_org})
+#         completed_slates = db.Assigned_Slates.count_documents({"owner_org": owner_org, "status": "Completed"})
+#         project_health = (completed_slates / total_slates * 100) if total_slates > 0 else 0
+        
+#         # Calculate average overdue
+#         overdue_pipeline = [
+#             {"$match": {
+#                 "owner_org": owner_org,
+#                 "status": {"$ne": "Completed"},
+#                 "due_date": {"$lt": current_date}
+#             }},
+#             {"$project": {
+#                 "days_overdue": {
+#                     "$divide": [
+#                         {"$subtract": [current_date, "$due_date"]},
+#                         1000 * 60 * 60 * 24  # Convert milliseconds to days
+#                     ]
+#                 }
+#             }},
+#             {"$group": {
+#                 "_id": None,
+#                 "average_overdue": {"$avg": "$days_overdue"},
+#                 "overdue_count": {"$sum": 1}
+#             }}
+#         ]
+        
+#         overdue_result = list(db.Assigned_Slates.aggregate(overdue_pipeline))
+        
+#         average_overdue = overdue_result[0]["average_overdue"] if overdue_result else 0
+#         overdue_slates = overdue_result[0]["overdue_count"] if overdue_result else 0
+        
+#     # Create a Pydantic model instance
+#     metrics = OrganizationMetrics(
+#         owner_org=owner_org,
+#         date=current_date,
+#         project_health=round(project_health, 2),
+#         average_overdue=round(average_overdue, 2),
+#         total_slates=total_slates,
+#         overdue_slates=overdue_slates
+#     )
+
+#     # Insert the data
+#     await db.OrganizationMetrics.insert_one(metrics.model_dump())
+
+# # Initialize the scheduler
+# scheduler = AsyncIOScheduler()
+# # Schedule the task to run daily at midnight
+# @asynccontextmanager
+# async def lifespan(app: FastAPI):
+#     # Startup
+#     scheduler.add_job(
+#         calculate_and_store_metrics,
+#         trigger=CronTrigger(hour=0, minute=0),
+#         id="calculate_metrics",
+#         name="Calculate and store organization metrics",
+#         replace_existing=True,
+#     )
+#     scheduler.start()
+#     yield
+#     # Shutdown
+#     scheduler.shutdown()
+
+
 # Origins for local deployment during development stage. 
 origins = [
     "http://localhost:3000",
@@ -79,6 +159,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"]
 )
+
+# Definition for the organization level KPIs that get calculated
+class OrganizationMetrics(BaseModel):
+    owner_org: str
+    date: datetime
+    project_health: int
+    average_overdue: int
+    total_slates: int
+    overdue_slates: int     
+
 
 # Class for defining the model of the key data on the users
 class Projects(BaseModel):
@@ -190,7 +280,7 @@ class SubmitSlateModel(BaseModel):
     project: str
     status: bool
 
-
+# Definition for the data that get's lumped from the Assigned_Slates, Users and Projects collections and sent as a bulk to the dashboard.
 class DashboardItem(BaseModel):
     id: str
     project_name: str
@@ -203,7 +293,7 @@ class DashboardItem(BaseModel):
     due_date: datetime
     description: str
     owner_org: str
-    last_updated: datetime       
+    last_updated: datetime      
 
 
 class TemplateCollection(BaseModel):
@@ -372,95 +462,68 @@ async def assign_slate(slate: AssignSlateModel = Body(...)):
         raise HTTPException(status_code=500, detail=str(e))
     
 
-
 # @app.put("/submit-slate/{form_id}")
 # async def update_form(request: Request, form_id: str):
 #     try:
+#         # Debug: Print raw form data
 #         form = await request.form()
-#         json_data = json.loads(form["json"])
-        
-#         files = form.getlist("files")
-        
-#         filename_mapping = {}
-        
-#         for file in files:
-#             if isinstance(file, UploadFile):
-#                 original_filename = file.filename
-#                 unique_filename = f"{uuid.uuid4()}_{original_filename}"
-#                 filename_mapping[original_filename] = unique_filename
-                
-#                 filepath = os.path.join(UPLOAD_DIRECTORY, unique_filename)
-                
-#                 contents = await file.read()
-#                 with open(filepath, "wb") as f:
-#                     f.write(contents)
-        
-#         # Update JSON data with new filenames
-#         for field_name, field_value in json_data['data'].items():
-#             if isinstance(field_value, list):
-#                 for item in field_value:
-#                     for key, value in item.items():
-#                         if value in filename_mapping:
-#                             item[key] = filename_mapping[value]
+#         print("Raw form data:", form)
 
+#         # Check if 'json' key exists in form data
+#         if 'json' not in form:
+#             return JSONResponse(status_code=400, content={"error": "Missing 'json' key in form data"})
+
+#         # Debug: Print raw JSON string
+#         raw_json = form['json']
+#         print("Raw JSON string:", raw_json)
+
+#         # Parse JSON data
+#         try:
+#             json_data = json.loads(raw_json)
+#         except json.JSONDecodeError as json_error:
+#             return JSONResponse(status_code=400, content={"error": f"Invalid JSON data: {str(json_error)}"})
+
+#         # Debug: Print parsed JSON data
+#         print("Parsed JSON data:", json_data)
+
+#         # Process files (if any)
+#         files = form.getlist("files")
+#         if files:
+#             filename_mapping = {}
+#             for file in files:
+#                 if isinstance(file, UploadFile):
+#                     original_filename = file.filename
+#                     unique_filename = f"{uuid.uuid4()}_{original_filename}"
+#                     filename_mapping[original_filename] = unique_filename
+#                     contents = await file.read()
+#                     # Upload file to Digital Ocean Spaces
+#                     spaces_client.put_object(
+#                         Bucket=DO_SPACE_NAME,
+#                         Key=unique_filename,
+#                         Body=contents,
+#                         ACL='private'
+#                     )
+
+#             # Update JSON data with file keys
+#             for field_name, field_value in json_data['data'].items():
+#                 if isinstance(field_value, list):
+#                     for item in field_value:
+#                         if isinstance(item, dict):
+#                             for key, value in item.items():
+#                                 if value in filename_mapping:
+#                                     item[key] = filename_mapping[value]
 
 #         # Update MongoDB
 #         update_result = await assigned_slates.update_one(
 #             {"_id": ObjectId(form_id)},
 #             {"$set": json_data}
 #         )
-        
-#         if update_result.modified_count == 0:
-#             return JSONResponse(status_code=404, content={"message": "Form not found or not modified"})
-        
-#         return JSONResponse(content={"message": "Form updated successfully", "data": json_data})
-#     except Exception as e:
-#         print(f"Error: {str(e)}")
-#         return JSONResponse(status_code=500, content={"error": str(e)})
-# @app.put("/submit-slate/{form_id}")
-# async def update_form(request: Request, form_id: str):
-#     try:
-#         form = await request.form()
-#         json_data = json.loads(form["json"])
-        
-#         files = form.getlist("files")
-        
-#         filename_mapping = {}
-        
-#         for file in files:
-#             if isinstance(file, UploadFile):
-#                 original_filename = file.filename
-#                 unique_filename = f"{uuid.uuid4()}_{original_filename}"
-#                 filename_mapping[original_filename] = unique_filename
-                
-#                 contents = await file.read()
-                
-#                 # Upload file to Digital Ocean Spaces
-#                 spaces_client.put_object(
-#                     Bucket=DO_SPACE_NAME,
-#                     Key=unique_filename,
-#                     Body=contents,
-#                     ACL='public-read'
-#                 )
-        
-#         # Update JSON data with new filenames
-#         for field_name, field_value in json_data['data'].items():
-#             if isinstance(field_value, list):
-#                 for item in field_value:
-#                     for key, value in item.items():
-#                         if value in filename_mapping:
-#                             item[key] = f"https://{DO_SPACE_NAME}.{DO_SPACE_REGION}.digitaloceanspaces.com/{filename_mapping[value]}"
 
-#         # Update MongoDB
-#         update_result = await assigned_slates.update_one(
-#             {"_id": ObjectId(form_id)},
-#             {"$set": json_data}
-#         )
-        
 #         if update_result.modified_count == 0:
 #             return JSONResponse(status_code=404, content={"message": "Form not found or not modified"})
-        
+
 #         return JSONResponse(content={"message": "Form updated successfully", "data": json_data})
+
 #     except Exception as e:
 #         print(f"Error: {str(e)}")
 #         return JSONResponse(status_code=500, content={"error": str(e)})
@@ -468,49 +531,111 @@ async def assign_slate(slate: AssignSlateModel = Body(...)):
 async def update_form(request: Request, form_id: str):
     try:
         form = await request.form()
-        json_data = json.loads(form["json"])
-        
+        print("Raw form data:", form)
+
+        if 'json' not in form:
+            return JSONResponse(status_code=400, content={"error": "Missing 'json' key in form data"})
+
+        raw_json = form['json']
+        print("Raw JSON string:", raw_json)
+
+        try:
+            json_data = json.loads(raw_json)
+        except json.JSONDecodeError as json_error:
+            return JSONResponse(status_code=400, content={"error": f"Invalid JSON data: {str(json_error)}"})
+
+        print("Parsed JSON data:", json_data)
+
+        # Process files
         files = form.getlist("files")
-        
+        print('files:', files)
         filename_mapping = {}
-        
         for file in files:
+            print(1)
             if isinstance(file, UploadFile):
-                original_filename = file.filename
-                unique_filename = f"{uuid.uuid4()}_{original_filename}"
-                filename_mapping[original_filename] = unique_filename
-                
-                contents = await file.read()
-                
-                # Upload file to Digital Ocean Spaces
-                spaces_client.put_object(
-                    Bucket=DO_SPACE_NAME,
-                    Key=unique_filename,
-                    Body=contents,
-                    ACL='private'  # Ensure the file is private
-                )
-        
-        # Update JSON data with file keys (not full URLs)
-        for field_name, field_value in json_data['data'].items():
-            if isinstance(field_value, list):
-                for item in field_value:
-                    for key, value in item.items():
-                        if value in filename_mapping:
-                            item[key] = filename_mapping[value]  # Store just the file key
+                print(2)
+                try:
+                    contents = await file.read()
+                    if contents:
+                        unique_filename = f"{uuid.uuid4()}_{file.filename}"
+                        filename_mapping[file.filename] = unique_filename
+                        # Upload file to Digital Ocean Spaces
+
+                        print('contents:', contents)
+                        try:
+                            spaces_client.put_object(
+                                Bucket=DO_SPACE_NAME,
+                                Key=unique_filename,
+                                Body=contents,
+                                ACL='private'
+                            )
+                            print(f"Successfully uploaded file: {unique_filename}")
+                        except Exception as upload_error:
+                            print(f"Error uploading file {file.filename}: {str(upload_error)}")
+                            return JSONResponse(status_code=500, content={"error": f"File upload failed: {str(upload_error)}"})
+                    else:
+                        print(f"Warning: File {file.filename} is empty")
+                except Exception as read_error:
+                    print(f"Error reading file {file.filename}: {str(read_error)}")
+                    return JSONResponse(status_code=500, content={"error": f"File read failed: {str(read_error)}"})
+                finally:
+                    await file.close()
+
+        # Update JSON data with file keys
+        if 'data' in json_data and isinstance(json_data['data'], dict):
+            for field_name, field_value in json_data['data'].items():
+                if isinstance(field_value, list):
+                    for item in field_value:
+                        if isinstance(item, dict):
+                            for key, value in item.items():
+                                if value in filename_mapping:
+                                    item[key] = filename_mapping[value]
 
         # Update MongoDB
         update_result = await assigned_slates.update_one(
             {"_id": ObjectId(form_id)},
             {"$set": json_data}
         )
-        
+
         if update_result.modified_count == 0:
             return JSONResponse(status_code=404, content={"message": "Form not found or not modified"})
-        
+
         return JSONResponse(content={"message": "Form updated successfully", "data": json_data})
+
     except Exception as e:
         print(f"Error: {str(e)}")
         return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+
+
+@app.get("/test-put-object/")
+async def test_put_object():
+    try:
+        test_key = 'test_object.txt'
+        test_data = 'This is a test object'
+
+        response = spaces_client.put_object(
+            Bucket=DO_SPACE_NAME,
+            Key=test_key,
+            Body=test_data,
+            ACL='private'
+        )
+        print("Put object response:", response)
+        return JSONResponse(content={"message": "Test object created successfully", "response": str(response)})
+    except ClientError as e:
+        error_code = e.response['Error']['Code']
+        error_message = e.response['Error']['Message']
+        print(f"ClientError: {error_code} - {error_message}")
+        return JSONResponse(status_code=500, content={
+            "error": f"Operation failed: {error_code}",
+            "message": error_message
+        })
+    except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        print("Detailed error:", error_trace)
+        return JSONResponse(status_code=500, content={"error": f"Operation failed: {str(e)}", "trace": error_trace})
 
 
 
@@ -743,6 +868,7 @@ async def edit_assigned_slate(slate_id: str, update: AssignSlateModel = Body(...
         # Update the form data in the database
         assigned_slate["due_date"] = update.due_date
         assigned_slate["assignee"] = update.assignee
+        assigned_slate["status"] = update.status
         assigned_slate["database_id"] = slate_id
         print(assigned_slate)
         await assigned_slates.replace_one({"_id": ObjectId(slate_id)}, assigned_slate)
@@ -1225,56 +1351,6 @@ async def remove_team_users(databaseIds: List[str], premiumKey: str):
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
 
 
-# @app.get("/dashboard-data")
-# async def get_dashboard_data(owner_org: str = Query(..., description="Organization ID to filter slates")):
-#     print('owner_org:', owner_org)
-#     debug_pipeline = [
-#         {"$match": {"owner_org": owner_org}},
-#         {"$lookup": {
-#             "from": "Projects",
-#             "localField": "projectId",
-#             "foreignField": "projectId",
-#             "as": "project_info"
-#         }},
-#         {"$unwind": {
-#             "path": "$project_info",
-#             "preserveNullAndEmptyArrays": True
-#         }},
-#         {"$lookup": {
-#             "from": "Users",
-#             "localField": "assignee",
-#             "foreignField": "email",
-#             "as": "user_info"
-#         }},
-#         {"$unwind": {
-#             "path": "$user_info",
-#             "preserveNullAndEmptyArrays": True
-#         }},
-#         {"$project": {
-#             "id": "$database_id",
-#             "project_name": "$project_info.projectName",
-#             "project_type": "$project_info.projectType",
-#             "slate_name": "$title",
-#             "status": {"$cond": ["$status", "Completed", "Active"]},
-#             "assignee_name": "$user_info.name",
-#             "assignee_email": "$assignee",
-#             "assigned_date": "$assigned_date",
-#             "due_date": "$due_date",
-#             "description": "$description",
-#             "owner_org": "$owner_org",
-#             "last_updated": "$last_updated"
-#         }},
-#         {"$limit": 5} 
-#     ]
-
-#     debug_result = await db.Assigned_Slates.aggregate(debug_pipeline).to_list(None)
-#     print("Debug result:", debug_result)
-#     count_pipeline = [
-#     {"$match": {"owner_org": owner_org}},
-#     {"$count": "matching_documents"}
-#     ]
-#     count_result = await db.Assigned_Slates.aggregate(count_pipeline).to_list(None)
-#     print("Count after match:", count_result)
 @app.get("/dashboard-data", response_model=List[DashboardItem])
 async def get_dashboard_data(owner_org: str = Query(..., description="Organization ID to filter slates")):
     pipeline = [
@@ -1321,6 +1397,60 @@ async def get_dashboard_data(owner_org: str = Query(..., description="Organizati
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+
+@app.get("/dashboard-kpis")
+async def get_dashboard_kpis(owner_org: str = Query(..., description="Organization ID to filter data")):
+    try:
+        current_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        three_months_ago = current_date - timedelta(days=90)
+        
+        # Get latest metrics
+        latest_metrics = db.OrganizationMetrics.find_one(
+            {"owner_org": owner_org},
+            sort=[("date", -1)]
+        )
+        
+        # Get metrics from a month ago for comparison
+        month_ago_metrics = db.OrganizationMetrics.find_one({
+            "owner_org": owner_org,
+            "date": {"$gte": current_date - timedelta(days=31), "$lt": current_date - timedelta(days=29)}
+        })
+        
+        # Calculate percentage change in average overdue
+        if month_ago_metrics and month_ago_metrics["average_overdue"] > 0:
+            percentage_change = ((latest_metrics["average_overdue"] - month_ago_metrics["average_overdue"]) / 
+                                 month_ago_metrics["average_overdue"]) * 100
+        else:
+            percentage_change = 0
+        
+        # Get project health data for the past 3 months
+        project_health_data = list(db.OrganizationMetrics.find(
+            {
+                "owner_org": owner_org,
+                "date": {"$gte": three_months_ago}
+            },
+            {"date": 1, "project_health": 1, "_id": 0}
+        ).sort("date", 1))
+        
+        return {
+            "average_overdue": {
+                "current": latest_metrics["average_overdue"],
+                "percentage_change": round(percentage_change, 2)
+            },
+            "project_health": [
+                {
+                    "date": item["date"].strftime("%Y-%m-%d"),
+                    "health": item["project_health"]
+                } for item in project_health_data
+            ]
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        client.close()
 
 
 # @app.put("/update-users/")
