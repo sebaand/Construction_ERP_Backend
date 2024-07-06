@@ -27,6 +27,7 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, Flowable
 from reportlab.lib.colors import black, HexColor
+from reportlab.lib.utils import ImageReader
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.enums import TA_LEFT, TA_CENTER
 from pdf_config import PDF_STYLE
@@ -68,15 +69,14 @@ class CustomCheckbox(Flowable):
         self.canv.restoreState()
 
 class HorizontalLine(Flowable):
-    def __init__(self, width, color):
+    def __init__(self, width):
         Flowable.__init__(self)
         self.width = width
-        self.color = color
 
     def draw(self):
-        self.canv.setStrokeColor(HexColor(self.color))
-        self.canv.setLineWidth(self.width)
-        self.canv.line(0, 0, 500, 0)
+        self.canv.setStrokeColor(black)
+        self.canv.setLineWidth(0.5)
+        self.canv.line(0, 0, self.width, 0)
 
 import traceback
 import logging
@@ -930,6 +930,9 @@ async def edit_assigned_slate(slate_id: str, update: AssignSlateModel = Body(...
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
+
+
+# function that formats RYG cell to fill the cell with the corresponding colour
 def color_name_to_hex(color_name):
     color_map = {
         'red': '#FF0000',
@@ -938,157 +941,7 @@ def color_name_to_hex(color_name):
     }
     return color_map.get(color_name.lower(), '#FFFFFF')  # Default to white if color not found
 
-# def generate_slate_pdf(slate):
-#     buffer = BytesIO()
-#     page_width, page_height = A4
-#     doc = SimpleDocTemplate(buffer, pagesize=A4, 
-#                             leftMargin=12.7*mm, rightMargin=12.7*mm,
-#                             topMargin=12.7*mm, bottomMargin=12.7*mm)
-    
-#     available_width = doc.width
-#     elements = []
-    
-#     # Define styles
-#     styles = getSampleStyleSheet()
-#     title_style = ParagraphStyle(
-#         'CustomTitle',
-#         parent=styles['Title'],
-#         fontSize=20,
-#         alignment=1,  # Center alignment
-#         spaceAfter=7.62*mm
-#     )
-#     heading_style = ParagraphStyle(
-#         'CustomHeading',
-#         parent=styles['Heading2'],
-#         fontSize=14,
-#         spaceBefore=5.08*mm,
-#         spaceAfter=2.54*mm
-#     )
-#     body_style = ParagraphStyle(
-#         'CustomBody',
-#         parent=styles['BodyText'],
-#         fontSize=10,
-#         spaceBefore=2.54*mm,
-#         spaceAfter=2.54*mm
-#     )
-#     cursive_style = ParagraphStyle(
-#         'Cursive',
-#         parent=styles['BodyText'],
-#         fontName='Cursive',
-#         fontSize=12
-#     )
-    
-#     # Add header information
-#     elements.append(Paragraph(f"<b>Assignee:</b> {slate['assignee']}", body_style))
-#     elements.append(Paragraph(f"<b>Project:</b> {slate['projectId']}", body_style))
-    
-#     # Handle last_updated date
-#     try:
-#         last_updated = datetime.strptime(slate['last_updated'], "%Y-%m-%dT%H:%M:%S.%fZ")
-#         formatted_date = last_updated.strftime('%d/%m/%Y')
-#     except ValueError:
-#         formatted_date = slate['last_updated']  # Use as-is if it's not in the expected format
-#     elements.append(Paragraph(f"<b>Completion Date:</b> {formatted_date}", body_style))
-#     elements.append(Spacer(1, 5.08*mm))
-
-#     # Add title
-#     elements.append(Paragraph(slate['title'], title_style))
-
-#     # Add description if available
-#     if slate.get('description'):
-#         elements.append(Paragraph(slate['description'], body_style))
-#         elements.append(Spacer(1, 5.08*mm))
-    
-#     # Process fields and data
-#     for field in slate['fields']:
-#         elements.append(Paragraph(field['label'], heading_style))
-        
-#         if field['field_type'] == 'table':
-#             # Prepare table data
-#             table_data = [[col['label'] for col in field['columns']]]
-#             raw_data = slate['data'].get(field['name'], [[]])
-            
-#             # Ensure raw_data has at least one row (the data row)
-#             if len(raw_data) > 0 and len(raw_data[0]) > 1:
-#                 data_row = raw_data[0][1:]  # Skip the first entry
-                
-#                 processed_row = []
-#                 for value, col in zip(data_row, field['columns']):
-#                     if col['dataType'] == 'picture':
-#                         try:
-#                             file_obj = spaces_client.get_object(Bucket=DO_SPACE_NAME, Key=value)
-#                             file_content = file_obj['Body'].read()
-#                             img = Image(BytesIO(file_content), width=20*mm, height=20*mm)
-#                             processed_row.append(img)
-#                         except ClientError as e:
-#                             logger.error(f"Error fetching image {value}: {str(e)}")
-#                             processed_row.append('Image not found')
-#                     elif col['dataType'] == 'colour':
-#                         processed_row.append(value)  # We'll handle coloring in the style
-#                     elif col['dataType'] == 'signature':
-#                         if value.startswith('data:image'):
-#                             image_data = base64.b64decode(value.split(',')[1])
-#                             img = Image(BytesIO(image_data), width=20*mm, height=10*mm)
-#                             processed_row.append(img)
-#                         else:
-#                             processed_row.append(Paragraph(value, cursive_style))
-#                     else:
-#                         processed_row.append(value)
-                
-#                 table_data.append(processed_row)
-            
-#             # Create table
-#             table_style = TableStyle([
-#                 ('BACKGROUND', (0, 0), (-1, 0), HexColor('#CCCCCC')),
-#                 ('TEXTCOLOR', (0, 0), (-1, 0), HexColor('#000000')),
-#                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-#                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-#                 ('FONTSIZE', (0, 0), (-1, 0), 12),
-#                 ('BOTTOMPADDING', (0, 0), (-1, 0), 3*mm),
-#                 ('BACKGROUND', (0, 1), (-1, -1), HexColor('#FFFFFF')),
-#                 ('TEXTCOLOR', (0, 1), (-1, -1), HexColor('#000000')),
-#                 ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-#                 ('FONTSIZE', (0, 1), (-1, -1), 10),
-#                 ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-#                 ('GRID', (0, 0), (-1, -1), 0.5*mm, HexColor('#000000'))
-#             ])
-
-#             print("table_data: ", table_data)
-#             # Add color-specific styles
-#             for i, col in enumerate(field['columns']):
-#                 if col['dataType'] == 'colour' and len(table_data) > 1:
-#                     color_value = str(table_data[1][i]).lower()
-#                     hex_color = color_name_to_hex(color_value)
-#                     table_style.add('BACKGROUND', (i, 1), (i, 1), HexColor(hex_color))
-
-#             # Adjust column widths
-#             available_width = doc.width
-#             col_widths = [min(max(40*mm, available_width / len(field['columns'])), available_width / 3) for _ in field['columns']]
-            
-#             t = Table(table_data, colWidths=col_widths)
-#             t.setStyle(table_style)
-#             elements.append(t)
-#         elif field['field_type'] == 'signature':
-#             value = slate['data'].get(field['name'], '')
-#             if value.startswith('data:image'):  # It's a base64 encoded image
-#                 image_data = base64.b64decode(value.split(',')[1])
-#                 img = Image(BytesIO(image_data), width=100*mm, height=50*mm)
-#                 elements.append(img)
-#             else:  # It's a typed signature
-#                 elements.append(Paragraph(value, cursive_style))
-#         elif field['field_type'] == 'checkbox':
-#             options = field.get('options', [])
-#             value = slate['data'].get(field['name'], [])
-#             checkbox_text = " ".join([f"[{'X' if opt in value else ' '}] {opt}" for opt in options])
-#             elements.append(Paragraph(checkbox_text, body_style))
-#     try:
-#         doc.build(elements)
-#     except Exception as e:
-#         # logger.error(f"Error building PDF: {str(e)}")
-#         raise
-
-#     buffer.seek(0)
-#     return buffer
+# function that formats the data of the slate in order to print it out on an A4 pdf
 def generate_slate_pdf(slate):
     buffer = BytesIO()
     page_width, page_height = A4
@@ -1105,6 +958,13 @@ def generate_slate_pdf(slate):
         'CustomTitle',
         parent=styles['Title'],
         fontSize=20,
+        alignment=1,  # Center alignment
+        spaceAfter=7.62*mm
+    )
+    description_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['BodyText'],
+        fontSize=16,
         alignment=1,  # Center alignment
         spaceAfter=7.62*mm
     )
@@ -1140,6 +1000,10 @@ def generate_slate_pdf(slate):
     except ValueError:
         formatted_date = slate['last_updated']  # Use as-is if it's not in the expected format
     elements.append(Paragraph(f"<b>Completion Date:</b> {formatted_date}", body_style))
+    
+     # Add horizontal line
+    elements.append(Spacer(1, 5.08*mm))
+    elements.append(HorizontalLine(available_width))
     elements.append(Spacer(1, 5.08*mm))
 
     # Add title
@@ -1147,7 +1011,7 @@ def generate_slate_pdf(slate):
 
     # Add description if available
     if slate.get('description'):
-        elements.append(Paragraph(slate['description'], body_style))
+        elements.append(Paragraph(slate['description'], description_style))
         elements.append(Spacer(1, 5.08*mm))
     
     # Process fields and data
@@ -1157,17 +1021,49 @@ def generate_slate_pdf(slate):
         if field['field_type'] == 'table':
             table_data = [[col['label'] for col in field['columns']]]
             raw_data = slate['data'].get(field['name'], [[]])
+            print('raw_data', raw_data)
+            print(len(raw_data[0]))
             
-            if len(raw_data) > 0 and len(raw_data[0]) > 1:
-                data_row = raw_data[0][1:]  # Skip the first entry
-                
+            # if len(raw_data) > 0 and len(raw_data[0]) > 1:
+            #     data_row = raw_data[0][1:]  # Skip the first entry as a null entry is created in cases wehre a length of greate than 1.
+            # elif len(raw_data[0]) == 1:
+            #     data_row = raw_data[0]
+            if len(raw_data) > 0:
+                if len(raw_data[0]) > 1:
+                    data_row = raw_data[0][1:]  # Skip the first entry
+                else:
+                    data_row = raw_data[0]
+
+                # Calculate cell width
+                num_columns = len(field['columns'])
+                cell_width = (available_width / num_columns) - 2*mm  # Subtracting 2mm for padding
+
+                print('data_row', data_row)
                 processed_row = []
                 for value, col in zip(data_row, field['columns']):
+                    print('col', col)
+                    print('value', value)
+                    print('picture id', data_row[value])
                     if col['dataType'] == 'picture':
                         try:
-                            file_obj = spaces_client.get_object(Bucket=DO_SPACE_NAME, Key=value)
+                        #     file_obj = spaces_client.get_object(Bucket=DO_SPACE_NAME, Key=data_row[value])
+                        #     file_content = file_obj['Body'].read()
+                        #     img = Image(BytesIO(file_content), width=15*mm, height=15*mm)  # Reduced size
+                        #     processed_row.append(img)
+                        # except ClientError as e:
+                        #     logger.error(f"Error fetching image {value}: {str(e)}")
+                        #     processed_row.append('Image not found')
+                            file_obj = spaces_client.get_object(Bucket=DO_SPACE_NAME, Key=data_row[value])
                             file_content = file_obj['Body'].read()
-                            img = Image(BytesIO(file_content), width=15*mm, height=15*mm)  # Reduced size
+                            img_reader = ImageReader(BytesIO(file_content))
+                            img_width, img_height = img_reader.getSize()
+                            aspect = img_height / float(img_width)
+                            
+                            # Scale image to fit cell width
+                            new_width = cell_width
+                            new_height = cell_width * aspect
+                            
+                            img = Image(BytesIO(file_content), width=new_width, height=new_height)
                             processed_row.append(img)
                         except ClientError as e:
                             logger.error(f"Error fetching image {value}: {str(e)}")
