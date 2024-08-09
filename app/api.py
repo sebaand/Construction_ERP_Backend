@@ -81,8 +81,8 @@ class HorizontalLine(Flowable):
 import traceback
 import logging
 
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
+# logging.basicConfig(level=logging.DEBUG)
+# logger = logging.getLogger(__name__)
 
 # imports for Auth0 roles:
 import json
@@ -130,80 +130,9 @@ spaces_client = boto3.client('s3',
     aws_secret_access_key=DO_SECRET_KEY
 )
 
-# async def calculate_and_store_metrics():    
-#     current_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-    
-#     # Get all unique owner_orgs
-#     owner_orgs = db.Assigned_Slates.distinct("owner_org")
-    
-#     for owner_org in owner_orgs:
-#         # Calculate project health
-#         total_slates = db.Assigned_Slates.count_documents({"owner_org": owner_org})
-#         completed_slates = db.Assigned_Slates.count_documents({"owner_org": owner_org, "status": "Completed"})
-#         project_health = (completed_slates / total_slates * 100) if total_slates > 0 else 0
-        
-#         # Calculate average overdue
-#         overdue_pipeline = [
-#             {"$match": {
-#                 "owner_org": owner_org,
-#                 "status": {"$ne": "Completed"},
-#                 "due_date": {"$lt": current_date}
-#             }},
-#             {"$project": {
-#                 "days_overdue": {
-#                     "$divide": [
-#                         {"$subtract": [current_date, "$due_date"]},
-#                         1000 * 60 * 60 * 24  # Convert milliseconds to days
-#                     ]
-#                 }
-#             }},
-#             {"$group": {
-#                 "_id": None,
-#                 "average_overdue": {"$avg": "$days_overdue"},
-#                 "overdue_count": {"$sum": 1}
-#             }}
-#         ]
-        
-#         overdue_result = list(db.Assigned_Slates.aggregate(overdue_pipeline))
-        
-#         average_overdue = overdue_result[0]["average_overdue"] if overdue_result else 0
-#         overdue_slates = overdue_result[0]["overdue_count"] if overdue_result else 0
-        
-#     # Create a Pydantic model instance
-#     metrics = OrganizationMetrics(
-#         owner_org=owner_org,
-#         date=current_date,
-#         project_health=round(project_health, 2),
-#         average_overdue=round(average_overdue, 2),
-#         total_slates=total_slates,
-#         overdue_slates=overdue_slates
-#     )
-
-#     # Insert the data
-#     await db.OrganizationMetrics.insert_one(metrics.model_dump())
-
-# # Initialize the scheduler
-# scheduler = AsyncIOScheduler()
-# # Schedule the task to run daily at midnight
-# @asynccontextmanager
-# async def lifespan(app: FastAPI):
-#     # Startup
-#     scheduler.add_job(
-#         calculate_and_store_metrics,
-#         trigger=CronTrigger(hour=0, minute=0),
-#         id="calculate_metrics",
-#         name="Calculate and store organization metrics",
-#         replace_existing=True,
-#     )
-#     scheduler.start()
-#     yield
-#     # Shutdown
-#     scheduler.shutdown()
-
-
 # Origins for local deployment during development stage. 
 origins = [
-    "http://localhost:3000",
+    "https://localhost:3000",
     "localhost:3000", 
     "https://www.sitesteer.ai", 
 ]
@@ -848,26 +777,47 @@ async def update_user_profile(project_id: str):
 
 # Route for updating the user profile  
 @app.put("/edit-project")
-async def update_user_profile(project_info: Projects = Body(...)):
+# async def update_user_profile(project_info: Projects = Body(...)):
+async def update_user_profile(project_info: dict):
+    # print('project_info', project_info)
     try:
         # Find the project in the database by mongoDB Id
-        project = await projects.find_one({"_id": ObjectId(project_info.database_id)})
+        project = await projects.find_one({"_id": ObjectId(project_info['database_id'])})
         # Update the user's profile fields
-        project["database_id"] = project_info.database_id
-        project["status"] = project_info.status
-        project["owner"] = project_info.owner
-        project["address"] = project_info.address
-        project["currency"] = project_info.currency
-        project["projectName"] = project_info.projectName
-        project["projectType"] = project_info.projectType
-        project["projectLead"] = project_info.projectLead
-        project["estimated_date"] = project_info.estimated_date
-        project["completion_date"] = project_info.completion_date
+        project["database_id"] = project_info['database_id']
+        project["status"] = project_info['status']
+        project["owner"] = project_info['owner']
+        project["address"] = project_info['address']
+        project["currency"] = project_info['currency']
+        project["projectName"] = project_info['projectName']
+        project["projectType"] = project_info['projectType']
+        project["projectLead"] = project_info['projectLead']
+        project["estimated_date"] = project_info['estimated_date']
+        project["completion_date"] = project_info['completion_date']
         # Update the user in the database
-        await projects.replace_one({"_id": ObjectId(project_info.database_id)}, project)
+        await projects.replace_one({"_id": ObjectId(project_info['database_id'])}, project)
         return {"message": "Project updated successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    # try:
+    #     # Find the project in the database by mongoDB Id
+    #     project = await projects.find_one({"_id": ObjectId(project_info.database_id)})
+    #     # Update the user's profile fields
+    #     project["database_id"] = project_info.database_id
+    #     project["status"] = project_info.status
+    #     project["owner"] = project_info.owner
+    #     project["address"] = project_info.address
+    #     project["currency"] = project_info.currency
+    #     project["projectName"] = project_info.projectName
+    #     project["projectType"] = project_info.projectType
+    #     project["projectLead"] = project_info.projectLead
+    #     project["estimated_date"] = project_info.estimated_date
+    #     project["completion_date"] = project_info.completion_date
+    #     # Update the user in the database
+    #     await projects.replace_one({"_id": ObjectId(project_info.database_id)}, project)
+    #     return {"message": "Project updated successfully"}
+    # except Exception as e:
+    #     raise HTTPException(status_code=500, detail=str(e))
     
 
 # # # # # # # # # # # # # # # # # # Project Details Routes # # # # # # # # # # # # # # # # # # # # # # # # 
@@ -1030,6 +980,7 @@ def generate_slate_pdf(slate):
             #     data_row = raw_data[0]
             if len(raw_data) > 0:
                 if len(raw_data[0]) > 1:
+                    # data_row = raw_data[0] # Skip the first entry
                     data_row = raw_data[0][1:]  # Skip the first entry
                 else:
                     data_row = raw_data[0]
@@ -1043,7 +994,6 @@ def generate_slate_pdf(slate):
                 for value, col in zip(data_row, field['columns']):
                     print('col', col)
                     print('value', value)
-                    print('picture id', data_row[value])
                     if col['dataType'] == 'picture':
                         try:
                         #     file_obj = spaces_client.get_object(Bucket=DO_SPACE_NAME, Key=data_row[value])
@@ -1218,21 +1168,30 @@ async def update_user_profile(user_profile: PlatformUsers = Body(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-
 # Route for updating the user profile  
 @app.post("/register")
 async def register_user(request: Request):
     user_profile = await request.json()
 
-    new_user = {
-            "email": user_profile["email"],
-            "auth0_id": user_profile["auth0_id"],
-            'database_id': None,
-            "name": None,
-            "organization": None,
-            "organization_id": [],
-        }
-    await platform_users.insert_one(new_user)
+    # Look for the user in the platforms database to check if they were already added to a team. 
+    user = await platform_users.find_one({"email": user_profile["email"]})
+    if user:
+        # Update the user's profile fields
+        user["auth0_id"] =  user_profile["auth0_id"]
+        # Update the user in the database
+        await platform_users.replace_one({"email": user_profile["email"]}, user)
+        return {"message": "User profile updated successfully"}
+    else:
+        # Create a new user profile
+        new_user = {
+                "email": user_profile["email"],
+                "auth0_id": user_profile["auth0_id"],
+                'database_id': None,
+                "name": None,
+                "organization": None,
+                "organization_id": [],
+            }
+        await platform_users.insert_one(new_user)
 
     # Process the user data and store it in your MongoDB database
     # Assign the user a default "basic tier" role in your database
@@ -1262,9 +1221,52 @@ async def register_user(request: Request):
     
     return {"message": "User registered successfully"}
 
+# # Route for updating the user profile  
+# @app.post("/register")
+# async def register_user(request: Request):
+#     user_profile = await request.json()
+
+#     new_user = {
+#             "email": user_profile["email"],
+#             "auth0_id": user_profile["auth0_id"],
+#             'database_id': None,
+#             "name": None,
+#             "organization": None,
+#             "organization_id": [],
+#         }
+#     await platform_users.insert_one(new_user)
+
+#     # Process the user data and store it in your MongoDB database
+#     # Assign the user a default "basic tier" role in your database
+    
+#     # Generate an access token for the Auth0 Management API
+#     payload = ({
+#     "roles": [
+#         "rol_qtPngFIhl1aJihaC"
+#     ]
+#     })
+
+#     # Make a request to the Auth0 Management API to assign the role
+#     url = f"https://{AUTH0_DOMAIN}/api/v2/users/{user_profile['auth0_id']}/roles"
+#     token = get_auth0_token()  # Obtain the access token
+#     headers = {
+#         "Authorization": f"Bearer {token}",
+#         "Content-Type": "application/json",
+#     }
+#     response = requests.post(url, headers=headers, data=json.dumps(payload))
+#     print("Response Status Code:", response.status_code)
+#     print("Response Text:", response.text)
+    
+#     if response.status_code == 204:
+#         print("Role assigned successfully")
+#     else:
+#         print(f"Error assigning role: {response.text}")
+    
+#     return {"message": "User registered successfully"}
+
     
 
-# Route for updating the user profile  
+# Route for updating which verifies successful login.
 @app.post("/login/")
 async def login_user():
     try:
@@ -1274,7 +1276,7 @@ async def login_user():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-
+#  Route for fetching the privacy policy
 @app.get("/privacy-notice-url")
 async def get_privacy_notice_url():
     # Generate a pre-signed URL for the privacy notice PDF
