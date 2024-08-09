@@ -130,80 +130,9 @@ spaces_client = boto3.client('s3',
     aws_secret_access_key=DO_SECRET_KEY
 )
 
-# async def calculate_and_store_metrics():    
-#     current_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-    
-#     # Get all unique owner_orgs
-#     owner_orgs = db.Assigned_Slates.distinct("owner_org")
-    
-#     for owner_org in owner_orgs:
-#         # Calculate project health
-#         total_slates = db.Assigned_Slates.count_documents({"owner_org": owner_org})
-#         completed_slates = db.Assigned_Slates.count_documents({"owner_org": owner_org, "status": "Completed"})
-#         project_health = (completed_slates / total_slates * 100) if total_slates > 0 else 0
-        
-#         # Calculate average overdue
-#         overdue_pipeline = [
-#             {"$match": {
-#                 "owner_org": owner_org,
-#                 "status": {"$ne": "Completed"},
-#                 "due_date": {"$lt": current_date}
-#             }},
-#             {"$project": {
-#                 "days_overdue": {
-#                     "$divide": [
-#                         {"$subtract": [current_date, "$due_date"]},
-#                         1000 * 60 * 60 * 24  # Convert milliseconds to days
-#                     ]
-#                 }
-#             }},
-#             {"$group": {
-#                 "_id": None,
-#                 "average_overdue": {"$avg": "$days_overdue"},
-#                 "overdue_count": {"$sum": 1}
-#             }}
-#         ]
-        
-#         overdue_result = list(db.Assigned_Slates.aggregate(overdue_pipeline))
-        
-#         average_overdue = overdue_result[0]["average_overdue"] if overdue_result else 0
-#         overdue_slates = overdue_result[0]["overdue_count"] if overdue_result else 0
-        
-#     # Create a Pydantic model instance
-#     metrics = OrganizationMetrics(
-#         owner_org=owner_org,
-#         date=current_date,
-#         project_health=round(project_health, 2),
-#         average_overdue=round(average_overdue, 2),
-#         total_slates=total_slates,
-#         overdue_slates=overdue_slates
-#     )
-
-#     # Insert the data
-#     await db.OrganizationMetrics.insert_one(metrics.model_dump())
-
-# # Initialize the scheduler
-# scheduler = AsyncIOScheduler()
-# # Schedule the task to run daily at midnight
-# @asynccontextmanager
-# async def lifespan(app: FastAPI):
-#     # Startup
-#     scheduler.add_job(
-#         calculate_and_store_metrics,
-#         trigger=CronTrigger(hour=0, minute=0),
-#         id="calculate_metrics",
-#         name="Calculate and store organization metrics",
-#         replace_existing=True,
-#     )
-#     scheduler.start()
-#     yield
-#     # Shutdown
-#     scheduler.shutdown()
-
-
 # Origins for local deployment during development stage. 
 origins = [
-    "http://localhost:3000",
+    "https://localhost:3000",
     "localhost:3000", 
     "https://www.sitesteer.ai", 
 ]
