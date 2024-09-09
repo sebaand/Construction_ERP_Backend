@@ -8,3 +8,7 @@ class PlatformUsers(BaseModel):
     organization_id: List[Dict[str, str]] = None
     email: str
     auth0_id: Optional[str]
+
+class UserData(BaseModel):
+    is_premium_user: bool
+    premium_key: Optional[str] = None

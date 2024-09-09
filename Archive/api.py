@@ -680,7 +680,7 @@ async def list_projects(owner: str):
 
 # PUT endpoint to delete a specific project
 @app.delete("/delete-project/")
-async def delete_slate(project_id: str, projectName: str, projectOwner: str):
+async def delete_project(project_id: str, projectName: str, projectOwner: str):
     query = {"owner": projectOwner, "project": projectName}
     try:        
         # Update the form data in the database

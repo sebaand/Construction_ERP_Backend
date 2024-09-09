@@ -1,7 +1,12 @@
 from fastapi import Depends
 from motor.motor_asyncio import AsyncIOMotorClient
 from app.services.mongodb_service import MongoDBService
+from app.services.slates_service import SlatesService
+from app.services.project_service import ProjectService
+from app.services.user_service import UserService
+from app.services.dashboard_service import DashboardService
 from app.config import settings
+from app.services.file_service import FileService
 
 async def get_mongodb_client():
     client = AsyncIOMotorClient(settings.MONGODB_URL)
@@ -12,3 +17,18 @@ async def get_mongodb_client():
 
 def get_mongodb_service(client: AsyncIOMotorClient = Depends(get_mongodb_client)):
     return MongoDBService(client)
+
+def get_slates_service(client: AsyncIOMotorClient = Depends(get_mongodb_client)):
+    return SlatesService(client)
+
+def get_project_service(client: AsyncIOMotorClient = Depends(get_mongodb_client)):
+    return ProjectService(client)
+
+def get_user_service(client: AsyncIOMotorClient = Depends(get_mongodb_client)):
+    return UserService(client)
+
+def get_dashboard_service(client: AsyncIOMotorClient = Depends(get_mongodb_client)):
+    return DashboardService(client)
+
+def get_file_service():
+    return FileService()
