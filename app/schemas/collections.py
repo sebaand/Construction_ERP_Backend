@@ -3,7 +3,8 @@ from typing import List, Optional
 from .slate import SlateTemplateModel, AssignSlateModel, SubmitSlateModel
 from .project import Projects
 from .user import PlatformUsers
-from .company import Company
+from .company import Company, PricingItem
+from .crm import Customer
 
 class TemplateCollection(BaseModel):
     forms: List[SlateTemplateModel]
@@ -23,3 +24,11 @@ class UsersCollection(BaseModel):
 
 class SlatesCollection(BaseModel):
     slates: List[SubmitSlateModel]
+
+class PricingData(BaseModel):
+    owner_org: str
+    items: List[PricingItem]
+
+class CRM_Data(BaseModel):
+    owner_org: str
+    items: List[Customer]
