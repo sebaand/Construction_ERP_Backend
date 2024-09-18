@@ -5,6 +5,7 @@ from .project import Projects
 from .user import PlatformUsers
 from .company import Company, PricingItem
 from .crm import Customer
+from .prospect import Prospect
 
 class TemplateCollection(BaseModel):
     forms: List[SlateTemplateModel]
@@ -32,3 +33,7 @@ class PricingData(BaseModel):
 class CRM_Data(BaseModel):
     owner_org: str
     items: List[Customer]
+
+class Prospect_Data(BaseModel):
+    owner_org: str
+    items: List[Prospect]

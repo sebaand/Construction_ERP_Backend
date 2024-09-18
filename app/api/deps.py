@@ -8,6 +8,7 @@ from app.services.dashboard_service import DashboardService
 from app.services.invoice_service import InvoiceService
 from app.services.company_service import CompanyService
 from app.services.crm_service import CRM_Service
+from app.services.prospect_service import Prospect_Service
 from app.config import settings
 from app.services.file_service import FileService
 
@@ -44,6 +45,9 @@ def get_company_service(client: AsyncIOMotorClient = Depends(get_mongodb_client)
 
 def get_crm_service(client: AsyncIOMotorClient = Depends(get_mongodb_client)):
     return CRM_Service(client)
+
+def get_prospect_service(client: AsyncIOMotorClient = Depends(get_mongodb_client)):
+    return Prospect_Service(client)
 
 def get_file_service():
     return FileService()
