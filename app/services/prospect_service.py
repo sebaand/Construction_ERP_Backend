@@ -4,7 +4,9 @@ from bson import ObjectId
 from fastapi import HTTPException
 from typing import List, Dict
 from app.schemas.prospect import Prospect
-from app.schemas.collections import Prospect_Data
+from app.schemas.prospect import MergedProspect
+from app.schemas.collections import Prospect_Data, MergedProspectData
+from app.services.crm_service import CRM_Service
 from uuid import uuid4
 
 class Prospect_Service:
@@ -26,6 +28,29 @@ class Prospect_Service:
                 items=[]
             )
         
+
+    async def get_merged_prospect_data(self, owner: str) -> MergedProspectData:
+        prospects = await self.get_prospect_data(owner)
+        customers = await CRM_Service.customer_list(owner)  # Assuming you have access to crm_service
+
+        company_lookup = {customer.companyId: customer.name for customer in customers.customers}
+
+        merged_items = [
+            MergedProspect(
+                companyId=prospect.companyId,
+                companyName=company_lookup.get(prospect.companyId, "Unknown"),
+                projectId=prospect.projectId,
+                projectName=prospect.projectName,
+                address=prospect.address,
+                # Add other fields as needed
+            )
+            for prospect in prospects.items
+        ]
+
+        return MergedProspectData(
+            owner_org=owner,
+            items=merged_items
+        )
 
     async def update_prospect_data(self, owner: str, Prospects: Prospect_Data) -> Prospect_Data:
         try:

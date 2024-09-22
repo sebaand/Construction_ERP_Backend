@@ -7,4 +7,10 @@ class Prospect(BaseModel):
     projectId: str
     projectName: str
     address: str
-    
+
+class MergedProspect(BaseModel):
+    companyId: str
+    companyName: str
+    projectId: str
+    projectName: str
+    address: str
