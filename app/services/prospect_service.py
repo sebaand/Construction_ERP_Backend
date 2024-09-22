@@ -3,6 +3,7 @@ from pydantic import ValidationError
 from bson import ObjectId
 from fastapi import HTTPException
 from typing import List, Dict
+from app.schemas.prospect import CustomerNamesList, CustomerInfo
 from app.schemas.prospect import Prospect
 from app.schemas.prospect import MergedProspect
 from app.schemas.collections import Prospect_Data, MergedProspectData
@@ -60,9 +61,9 @@ class Prospect_Service:
             updated_items = []
             for item in Prospects.items:
                 if not item.projectId:
-                    # Generate a new companyId for new customers (empty string)
+                    # Generate a new companyId for new prospect (empty string)
                     item.projectId = str(uuid4())
-                # If companyId is not empty, it's an existing customer, so we keep the id
+                # If companyId is not empty, it's an existing prospect, so we keep the id
                 updated_items.append(item)
 
             validated_data = Prospect_Data(
@@ -80,14 +81,33 @@ class Prospect_Service:
                     update_data
                 )
                 if result.modified_count == 0:
-                    raise HTTPException(status_code=400, detail="Failed to update customer details")
+                    raise HTTPException(status_code=400, detail="Failed to update prospect details")
             else:
                 result = await self.prospect_details.insert_one(update_data)
                 if not result.inserted_id:
-                    raise HTTPException(status_code=400, detail="Failed to create customer details")
+                    raise HTTPException(status_code=400, detail="Failed to create prospect details")
 
             return validated_data
         except ValidationError as e:
             raise HTTPException(status_code=422, detail=e.errors())
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
+        
+
+# Function returning the lost of customers that have a prospect
+    async def customer_list(self, owner: str) -> CustomerNamesList:
+        prospect_data =  get_merged_prospect_data({"owner_org": owner})
+        if prospect_data:
+            customers = [
+                CustomerInfo(companyId=item.get("companyId", ""), name=item.get("name", ""))
+                for item in prospect_data.get("items", [])
+            ]
+            return CustomerNamesList(
+                owner_org=owner,
+                customers=customers
+            )
+        else:
+            return CustomerNamesList(
+                owner_org=owner,
+                customers=[]
+            )

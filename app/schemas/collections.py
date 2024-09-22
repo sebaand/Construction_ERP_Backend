@@ -6,34 +6,43 @@ from .user import PlatformUsers
 from .company import Company, PricingItem
 from .crm import Customer
 from .prospect import Prospect, MergedProspect
+from .quote import MergedQuote, Quote
 
-class TemplateCollection(BaseModel):
-    forms: List[SlateTemplateModel]
 
+# Projects Collections
 class ProjectsCollection(BaseModel):
     user_projects: List[Projects]
 
-class AssignedSlatesCollection(BaseModel):
-    slates: List[AssignSlateModel]
-
+# Company Collections
 class CompanyDetails(BaseModel):
     details: List[Company]
 
+# Users Collections
 class UsersCollection(BaseModel):
     users: List[PlatformUsers]
     premium_key: Optional[str] = None
 
+# Slates Collections
 class SlatesCollection(BaseModel):
     slates: List[SubmitSlateModel]
 
+class AssignedSlatesCollection(BaseModel):
+    slates: List[AssignSlateModel]
+
+class TemplateCollection(BaseModel):
+    forms: List[SlateTemplateModel]
+
+# Pricing Collections
 class PricingData(BaseModel):
     owner_org: str
     items: List[PricingItem]
 
+# CRM Collections
 class CRM_Data(BaseModel):
     owner_org: str
     items: List[Customer]
 
+# Prospect Collections
 class Prospect_Data(BaseModel):
     owner_org: str
     items: List[Prospect]
@@ -41,3 +50,12 @@ class Prospect_Data(BaseModel):
 class MergedProspectData(BaseModel):
     owner_org: str
     items: List[MergedProspect]
+
+# Quote Collections
+class Quote_Data(BaseModel):
+    owner_org: str
+    items: List[Quote]
+
+class MergedQuoteData(BaseModel):
+    owner_org: str
+    items: List[MergedQuote]
