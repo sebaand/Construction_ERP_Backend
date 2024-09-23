@@ -15,10 +15,10 @@ class MergedProspect(BaseModel):
     projectName: str
     address: str
 
-class CustomerInfo(BaseModel):
-    companyId: str
-    name: str
+class ProspectInfo(BaseModel):
+    projectId: str
+    projectName: str
 
-class CustomerNamesList(BaseModel):
+class ProspectsNamesList(BaseModel):
     owner_org: str
-    customers: List[CustomerInfo]
+    prospects: List[ProspectInfo]

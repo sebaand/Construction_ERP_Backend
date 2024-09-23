@@ -2,8 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, Body, Query
 from app.schemas.quote import MergedQuote
 from app.schemas.collections import Quote_Data, MergedQuoteData
 from app.services.quote_service import Quote_Service
+from app.services.prospect_service import Prospect_Service
 from app.services.crm_service import CRM_Service
-from app.api.deps import get_prospect_service, get_quote_service
+from app.api.deps import get_prospect_service, get_quote_service, get_crm_service 
 
 router = APIRouter()
 
@@ -19,13 +20,15 @@ async def get_quote_data(
 async def get_merged_quote_data(
     owner: str = Query(...),
     quote_service: Quote_Service = Depends(get_quote_service),
-    prospect_service: CRM_Service = Depends(get_prospect_service)
+    prospect_service: Prospect_Service = Depends(get_prospect_service),
+    crm_service: CRM_Service = Depends(get_crm_service)
 ):
     quotes = await quote_service.get_quote_data(owner)
-    prospects = await prospect_service.customer_list(owner)
+    prospects = await prospect_service.prospect_list(owner)
+    customers = await crm_service.customer_list(owner)
 
-    # Create a lookup dictionary for company names
-    company_lookup = {prospect.companyId: prospect.name for prospect in prospects.prospects}
+    # Create a lookup dictionary for company names and prospect name
+    company_lookup = {customer.companyId: customer.name for customer in customers.customers}
     project_lookup = {prospect.projectId: prospect.projectName for prospect in prospects.prospects}
 
     merged_items = [

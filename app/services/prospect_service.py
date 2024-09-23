@@ -3,9 +3,8 @@ from pydantic import ValidationError
 from bson import ObjectId
 from fastapi import HTTPException
 from typing import List, Dict
-from app.schemas.prospect import CustomerNamesList, CustomerInfo
-from app.schemas.prospect import Prospect
-from app.schemas.prospect import MergedProspect
+from app.schemas.crm import CustomerInfo, CustomerNamesList
+from app.schemas.prospect import Prospect, MergedProspect, ProspectsNamesList, ProspectInfo
 from app.schemas.collections import Prospect_Data, MergedProspectData
 from app.services.crm_service import CRM_Service
 from uuid import uuid4
@@ -14,6 +13,7 @@ class Prospect_Service:
     def __init__(self, client: AsyncIOMotorClient):
         self.db = client.Forms
         self.prospect_details = self.db.get_collection("Prospects")
+        self.crm_details = self.db.get_collection("CRM")
 
 
     async def get_prospect_data(self, owner: str) -> Prospect_Data:
@@ -94,14 +94,28 @@ class Prospect_Service:
             raise HTTPException(status_code=500, detail=str(e))
         
 
-# Function returning the lost of customers that have a prospect
+    # Function returning the list of customers that have a prospect
     async def customer_list(self, owner: str) -> CustomerNamesList:
-        prospect_data =  get_merged_prospect_data({"owner_org": owner})
-        if prospect_data:
-            customers = [
-                CustomerInfo(companyId=item.get("companyId", ""), name=item.get("name", ""))
-                for item in prospect_data.get("items", [])
-            ]
+        crm_data = await self.crm_details.find_one({"owner_org": owner})
+        prospect_data = await self.prospect_details.find_one({"owner_org": owner})
+        
+        if crm_data and prospect_data:
+            # Create a lookup dictionary for company names from CRM data
+            company_lookup = {
+                item.get("companyId", ""): item.get("name", "")
+                for item in crm_data.get("items", [])
+            }
+            
+            # Process prospect data and match with company names
+            customers = []
+            seen_company_ids = set()  # To avoid duplicates
+            for item in prospect_data.get("items", []):
+                company_id = item.get("companyId", "")
+                if company_id and company_id not in seen_company_ids:
+                    company_name = company_lookup.get(company_id, "Unknown")
+                    customers.append(CustomerInfo(companyId=company_id, name=company_name))
+                    seen_company_ids.add(company_id)
+            
             return CustomerNamesList(
                 owner_org=owner,
                 customers=customers
@@ -110,4 +124,22 @@ class Prospect_Service:
             return CustomerNamesList(
                 owner_org=owner,
                 customers=[]
+            )
+        
+    # Function returning list of prospectid and name 
+    async def prospect_list(self, owner: str) -> ProspectsNamesList:
+        prospect_data = await self.prospect_details.find_one({"owner_org": owner})
+        if prospect_data:
+            prospects = [
+                ProspectInfo(companyId=item.get("companyId", ""), name=item.get("name", ""))
+                for item in prospect_data.get("items", [])
+            ]
+            return ProspectsNamesList(
+                owner_org=owner,
+                prospects=prospects
+            )
+        else:
+            return ProspectsNamesList(
+                owner_org=owner,
+                prospects=[]
             )

@@ -6,6 +6,7 @@ from typing import List, Dict
 from app.schemas.quote import Quote, MergedQuote
 from app.schemas.collections import Quote_Data, MergedQuoteData
 from app.services.prospect_service import Prospect_Service
+from app.services.crm_service import CRM_Service
 from uuid import uuid4
 
 class Quote_Service:
@@ -30,9 +31,11 @@ class Quote_Service:
 
     async def get_merged_quote_data(self, owner: str) -> MergedQuoteData:
         quotes = await self.get_quote_data(owner)
-        prospects = await Prospect_Service.customer_list(owner)
+        prospects = await Prospect_Service.prospect_list(owner)
+        customers = await CRM_Service.customer_list(owner)
 
-        company_lookup = {prospect.companyId: prospect.name for prospect in prospects.prospects}
+        # Create a lookup dictionary for company names and prospect name
+        company_lookup = {customer.companyId: customer.name for customer in customers.customers}
         project_lookup = {prospect.projectId: prospect.projectName for prospect in prospects.prospects}
 
         merged_items = [
@@ -53,6 +56,7 @@ class Quote_Service:
             owner_org=owner,
             items=merged_items
         )
+
 
     async def update_quote_data(self, owner: str, Quotes: Quote_Data) -> Quote_Data:
         try:
