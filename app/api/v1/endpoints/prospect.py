@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Body, Query
 from app.schemas.prospect import Prospect
-from app.schemas.prospect import CustomerNamesList
-from app.schemas.prospect import MergedProspect
+from app.schemas.crm import CustomerNamesList
+from app.schemas.prospect import MergedProspect, ProspectsNamesList
 from app.schemas.collections import Prospect_Data, MergedProspectData
 from app.services.prospect_service import Prospect_Service
 from app.services.crm_service import CRM_Service
@@ -53,6 +53,15 @@ async def customer_list(
     prospect_service: CRM_Service = Depends(get_crm_service)
 ):
     return await prospect_service.customer_list(owner)
+
+
+@router.get("/prospect-list/", response_model=ProspectsNamesList)
+async def prospect_list(
+    owner: str = Query(...),
+    prospect_service: Prospect_Service = Depends(get_prospect_service)
+):
+    return await prospect_service.prospect_list(owner)
+
 
 
 @router.post("/prospect-details/", response_model=Prospect_Data)
