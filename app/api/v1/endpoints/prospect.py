@@ -50,7 +50,7 @@ async def get_merged_prospect_data(
 @router.get("/customer-list/", response_model=CustomerNamesList)
 async def customer_list(
     owner: str = Query(...),
-    prospect_service: CRM_Service = Depends(get_crm_service)
+    prospect_service: Prospect_Service = Depends(get_prospect_service)
 ):
     return await prospect_service.customer_list(owner)
 

@@ -131,7 +131,7 @@ class Prospect_Service:
         prospect_data = await self.prospect_details.find_one({"owner_org": owner})
         if prospect_data:
             prospects = [
-                ProspectInfo(companyId=item.get("companyId", ""), name=item.get("name", ""))
+                ProspectInfo(projectId=item.get("projectId", ""), projectName=item.get("projectName", ""), address=item.get("address", ""))
                 for item in prospect_data.get("items", [])
             ]
             return ProspectsNamesList(

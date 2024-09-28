@@ -30,14 +30,16 @@ async def get_merged_quote_data(
     # Create a lookup dictionary for company names and prospect name
     company_lookup = {customer.companyId: customer.name for customer in customers.customers}
     project_lookup = {prospect.projectId: prospect.projectName for prospect in prospects.prospects}
+    address_lookup = {prospect.projectId: prospect.address for prospect in prospects.prospects}
 
     merged_items = [
         MergedQuote(
+            quoteId=quote.quoteId,
             companyId=quote.companyId,
             companyName=company_lookup.get(quote.companyId, "Unknown"),
             projectId=quote.projectId,
             projectName=project_lookup.get(quote.projectId, "Unknown"),
-            address=quote.address,
+            address=address_lookup.get(quote.projectId, "Unknown"),
             name=quote.name,
             status=quote.name
             # Add other fields as needed

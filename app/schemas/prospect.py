@@ -18,6 +18,7 @@ class MergedProspect(BaseModel):
 class ProspectInfo(BaseModel):
     projectId: str
     projectName: str
+    address: str
 
 class ProspectsNamesList(BaseModel):
     owner_org: str

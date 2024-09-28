@@ -12,6 +12,7 @@ class MergedQuote(BaseModel):
     companyId: str
     companyName: str
     projectId: str  
+    address: str
     projectName: str 
     name: str
     status: str
