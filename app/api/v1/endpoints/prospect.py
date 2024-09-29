@@ -36,6 +36,7 @@ async def get_merged_prospect_data(
             projectId=prospect.projectId,
             projectName=prospect.projectName,
             address=prospect.address,
+            status=prospect.status,
             # Add other fields as needed
         )
         for prospect in prospects.items
@@ -63,7 +64,6 @@ async def prospect_list(
     return await prospect_service.prospect_list(owner)
 
 
-
 @router.post("/prospect-details/", response_model=Prospect_Data)
 async def update_prospect_data(
     owner: str = Query(...),
@@ -71,3 +71,17 @@ async def update_prospect_data(
     prospect_service: Prospect_Service = Depends(get_prospect_service)
 ):
     return await prospect_service.update_prospect_data(owner, prospect_data)
+
+
+@router.post("/archive/")
+async def archive_prospect(
+    owner: str = Query(...),
+    projectId: str = Query(...),
+    prospect_service: Prospect_Service = Depends(get_prospect_service)
+):
+    try:
+        return await prospect_service.archive_prospect(owner, projectId)
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")

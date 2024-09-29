@@ -97,3 +97,20 @@ class Quote_Service:
             raise HTTPException(status_code=422, detail=e.errors())
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
+        
+
+    async def archive_quote(self, owner: str, quoteId: str) -> None:
+        result = await self.quote_details.update_one(
+            {"owner_org": owner, "items.quoteId": quoteId},
+            {"$set": {"items.$.status": "Archived"}}
+        )
+
+        if result.modified_count == 0:
+            raise HTTPException(status_code=404, detail="Qutoe not found or already archived")
+
+        # Fetch and return the updated document
+        updated_doc = await self.quote_details.find_one({"owner_org": owner})
+        if not updated_doc:
+            raise HTTPException(status_code=404, detail="Updated document not found")
+
+        return Quote_Data(**updated_doc)

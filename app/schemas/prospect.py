@@ -1,12 +1,13 @@
 from pydantic import BaseModel
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 class Prospect(BaseModel):
     companyId: str
     projectId: str
     projectName: str
     address: str
+    status: Optional[str]
 
 class MergedProspect(BaseModel):
     companyId: str
@@ -14,6 +15,7 @@ class MergedProspect(BaseModel):
     projectId: str
     projectName: str
     address: str
+    status: Optional[str]
 
 class ProspectInfo(BaseModel):
     projectId: str

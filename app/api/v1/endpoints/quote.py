@@ -41,7 +41,7 @@ async def get_merged_quote_data(
             projectName=project_lookup.get(quote.projectId, "Unknown"),
             address=address_lookup.get(quote.projectId, "Unknown"),
             name=quote.name,
-            status=quote.name
+            status=quote.status
             # Add other fields as needed
         )
         for quote in quotes.items
@@ -59,3 +59,17 @@ async def update_quote_data(
     quote_service: Quote_Service = Depends(get_quote_service)
 ):
     return await quote_service.update_quote_data(owner, quote_data)
+
+
+@router.post("/archive/")
+async def archive_quote(
+    owner: str = Query(...),
+    quoteId: str = Query(...),
+    quote_service: Quote_Service = Depends(get_quote_service)
+):
+    try:
+        return await quote_service.archive_quote(owner, quoteId)
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
