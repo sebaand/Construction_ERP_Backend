@@ -7,7 +7,7 @@ app = FastAPI(title="SiteSteer API")
 # CORS middleware setup
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "https://localhost:3000"],  # Allow your frontend origin
+    allow_origins=["https://www.sitesteer.ai", "https://localhost:3000"],  # Allow your frontend origin
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
