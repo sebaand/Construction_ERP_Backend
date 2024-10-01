@@ -4,7 +4,8 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from bson import ObjectId
 from fastapi import HTTPException
 from typing import List, Dict
-from app.schemas.slate import CreateSlateModel, AssignSlateModel, SlateTemplateModel, SubmitSlateModel
+from typing import Optional
+from app.schemas.slate import CreateTemplateModel, AssignSlateModel, SlateTemplateModel, SubmitSlateModel
 from app.schemas.collections import TemplateCollection, AssignedSlatesCollection
 
 class SlatesService:
@@ -20,6 +21,38 @@ class SlatesService:
             form["database_id"] = str(form["_id"])
         return TemplateCollection(forms=forms)
 
+    # async def get_template(self, owner_org: str, templateId: ObjectId) -> SlateTemplateModel:
+    #     query = {"owner_org": owner_org, "_id": templateId}
+    #     form = await self.templates.find_one(query)
+    #     if not form:
+    #         return None
+    #     form["database_id"] = str(form["_id"])
+    #     return SlateTemplateModel(**form)
+
+    async def template_exists(self, owner_org: str, templateId: str) -> bool:
+        try:
+            object_id = ObjectId(templateId)
+            query = {"owner_org": owner_org, "_id": object_id}
+            form = await self.templates.find_one(query, projection={"_id": 1})
+            return form is not None
+        except Exception as e:
+            # Log the error here if needed
+            return False
+
+    async def get_template(self, owner_org: str, templateId: str) -> Optional[SlateTemplateModel]:
+        try:
+            object_id = ObjectId(templateId)
+            query = {"owner_org": owner_org, "_id": object_id}
+            form = await self.templates.find_one(query)
+            if not form:
+                return None
+            form["database_id"] = str(form["_id"])
+            del form["_id"]  # Remove the ObjectId as it's not JSON serializable
+            return SlateTemplateModel(**form)
+        except Exception as e:
+            # Log the error here if needed
+            return None
+
     async def list_user_slates(self, assignee: str, status: bool) -> AssignedSlatesCollection:
         query = {"assignee": assignee, "status": status}
         slates = await self.assigned_slates.find(query).to_list(10000)
@@ -27,7 +60,7 @@ class SlatesService:
             slate["database_id"] = str(slate["_id"])
         return AssignedSlatesCollection(slates=slates)
 
-    async def create_slate(self, slate: CreateSlateModel) -> Dict[str, str]:
+    async def create_slate(self, slate: CreateTemplateModel) -> Dict[str, str]:
         slate_dict = slate.model_dump(by_alias=True)
         insert_result = await self.templates.insert_one(slate_dict)
         return {"message": "Form data submitted successfully", "id": str(insert_result.inserted_id)}
@@ -46,7 +79,7 @@ class SlatesService:
             raise HTTPException(status_code=404, detail="Form not found or not modified")
         return {"message": "Form updated successfully", "data": json_data}
 
-    async def update_slate_template(self, template_id: str, slate: CreateSlateModel) -> Dict[str, str]:
+    async def update_slate_template(self, template_id: str, slate: CreateTemplateModel) -> Dict[str, str]:
         slate_dict = slate.model_dump(by_alias=True)
         update_result = await self.templates.update_one({"_id": ObjectId(template_id)}, {"$set": slate_dict})
         if update_result.modified_count == 1:

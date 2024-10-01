@@ -1,7 +1,7 @@
 from motor.motor_asyncio import AsyncIOMotorClient
 from fastapi import HTTPException
 from app.schemas.project import Projects
-from app.schemas.slate import CreateSlateModel, AssignSlateModel, SlateTemplateModel, SubmitSlateModel
+from app.schemas.slate import CreateTemplateModel, AssignSlateModel, SlateTemplateModel, SubmitSlateModel
 from app.schemas.collections import ProjectsCollection, TemplateCollection, AssignedSlatesCollection
 from app.schemas.invoice import Invoice
 from bson import ObjectId

@@ -21,7 +21,7 @@ class FormField(BaseModel):
     max_value: Optional[Union[int, float]] = None
     columns: Optional[List[TableColumn]] = None
 
-class CreateSlateModel(BaseModel):
+class CreateTemplateModel(BaseModel):
     title: str
     description: str
     owner_org: str
@@ -67,3 +67,31 @@ class SubmitSlateModel(BaseModel):
     title: str
     project: str
     status: bool
+
+class DraftSlateModel(BaseModel):
+    assigned_date: datetime
+    assignee: str
+    data: Dict[str, Any]
+    database_id: str
+    description: str
+    due_date: datetime
+    fields: List[FormField]
+    last_updated: datetime
+    owner_org: str
+    title: str
+    projectId: str
+    status: str
+
+class QuoteSlateModel(BaseModel):
+    assigned_date: datetime
+    assignee: str
+    data: Dict[str, Any]
+    database_id: str
+    description: str
+    due_date: datetime
+    fields: List[FormField]
+    last_updated: datetime
+    owner_org: str
+    title: str
+    quoteId: str
+    status: str

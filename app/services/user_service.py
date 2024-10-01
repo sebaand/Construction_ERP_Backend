@@ -20,6 +20,7 @@ class UserService:
             return PlatformUsers(**user)
         return None
 
+
     async def get_user_data(self, email: str) -> UserData:
         user = await self.platform_users.find_one({"email": email})
         if user:
@@ -36,9 +37,11 @@ class UserService:
                 return UserData(is_premium_user=True, premium_key=premium_org_id)
         return UserData(is_premium_user=False)
 
+
     async def early_signon(self, user_profile: EarlyBird) -> Dict[str, str]:
         result = await self.early_birds.insert_one(user_profile.model_dump(by_alias=True))
         return {"message": "Early bird request added to database"}
+
 
     async def update_user_profile(self, user_profile: PlatformUsers) -> Dict[str, str]:
         user = await self.platform_users.find_one({"auth0_id": user_profile.auth0_id})
