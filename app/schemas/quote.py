@@ -35,13 +35,10 @@ class QuoteSlateModel(BaseModel):
 #     projectName: str 
 #     name: str
 #     status: str
+    
+
 class MergedQuote(BaseModel):
-    assigned_date: datetime
-    assignee: str
     data: Dict[str, Any]
-    database_id: str
-    description: str
-    due_date: datetime
     fields: List[FormField]
     last_updated: datetime
     title: str
@@ -51,6 +48,7 @@ class MergedQuote(BaseModel):
     companyId: str  
     status: str
     companyName: str
-    address: str
-    projectName: str 
+    company_address: str
+    projectName: str
+    site_address: str
     

@@ -39,15 +39,17 @@ class Quote_Service:
         customers = await self.crm_service.customer_list(owner)  # Use instance method
 
         company_lookup = {customer.companyId: customer.name for customer in customers.customers}
+        company_address_lookup = {customer.companyId: customer.company_address for customer in customers.customers}
         project_lookup = {prospect.projectId: prospect.projectName for prospect in prospects.prospects}
-        address_lookup = {prospect.projectId: prospect.address for prospect in prospects.prospects}
+        site_address_lookup = {prospect.projectId: prospect.site_address for prospect in prospects.prospects}
 
         merged_items = [
             MergedQuote(
                 **quote.model_dump(),
                 companyName=company_lookup.get(quote.companyId, "Unknown"),
+                company_address=company_address_lookup.get(quote.companyId, "Unknown"),
                 projectName=project_lookup.get(quote.projectId, "Unknown"),
-                address=address_lookup.get(quote.projectId, "Unknown")
+                site_address=site_address_lookup.get(quote.projectId, "Unknown")
             )
             for quote in quotes.items
         ]

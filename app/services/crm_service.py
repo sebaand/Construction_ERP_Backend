@@ -3,7 +3,7 @@ from pydantic import ValidationError
 from bson import ObjectId
 from fastapi import HTTPException
 from typing import List, Dict
-from app.schemas.crm import Customer, CustomerInfo, CustomerNamesList
+from app.schemas.crm import Customer, CustomerInfo, CustomerNamesList, CustomerList
 from app.schemas.collections import CRM_Data
 from uuid import uuid4
 
@@ -30,7 +30,7 @@ class CRM_Service:
         crm_data = await self.crm_details.find_one({"owner_org": owner})
         if crm_data:
             customers = [
-                CustomerInfo(companyId=item.get("companyId", ""), name=item.get("name", ""))
+                CustomerInfo(companyId=item.get("companyId", ""), name=item.get("name", ""), company_address=item.get("company_address", ""), vat_nm=item.get("vat_nm", ""), company_nm=item.get("company_nm", ""), telephone=item.get("telephone", ""))
                 for item in crm_data.get("items", [])
             ]
             return CustomerNamesList(

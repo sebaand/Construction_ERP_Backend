@@ -35,15 +35,23 @@ class Prospect_Service:
         customers = await CRM_Service.customer_list(owner)  # Assuming you have access to crm_service
 
         company_lookup = {customer.companyId: customer.name for customer in customers.customers}
+        company_address_lookup = {customer.companyId: customer.company_address for customer in customers.customers}
+        company_vat_lookup = {customer.companyId: customer.vat_nm for customer in customers.customers}
+        company_nm_lookup = {customer.companyId: customer.company_nm for customer in customers.customers}
+        telephone_lookup = {customer.companyId: customer.phone for customer in customers.customers}
 
         merged_items = [
             MergedProspect(
                 companyId=prospect.companyId,
                 companyName=company_lookup.get(prospect.companyId, "Unknown"),
+                company_address=company_address_lookup.get(prospect.companyId, "Unknown"),
                 projectId=prospect.projectId,
                 projectName=prospect.projectName,
-                address=prospect.address,
+                site_address=prospect.site_address,
                 status=prospect.status,
+                company_nm=company_nm_lookup.get(prospect.companyId, "Unknown"),
+                vat_nm=company_vat_lookup.get(prospect.companyId, "Unknown"),
+                telephone=telephone_lookup.get(prospect.companyId, "Unknown"),
                 # Add other fields as needed
             )
             for prospect in prospects.items
@@ -132,7 +140,7 @@ class Prospect_Service:
         prospect_data = await self.prospect_details.find_one({"owner_org": owner})
         if prospect_data:
             prospects = [
-                ProspectInfo(projectId=item.get("projectId", ""), projectName=item.get("projectName", ""), address=item.get("address", ""))
+                ProspectInfo(projectId=item.get("projectId", ""), projectName=item.get("projectName", ""), site_address=item.get("site_address", ""))
                 for item in prospect_data.get("items", [])
             ]
             return ProspectsNamesList(

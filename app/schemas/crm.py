@@ -4,17 +4,25 @@ from typing import List
 class Customer(BaseModel):
     companyId: str
     name: str
-    address: str
+    company_address: str
     contact: str
     email: str
-    phone: str
+    telephone: str
     vat_nm: str
     company_nm: str
 
 class CustomerInfo(BaseModel):
     companyId: str
+    company_address: str
+    vat_nm: str
+    company_nm: str
     name: str
+    telephone: str
 
 class CustomerNamesList(BaseModel):
     owner_org: str
     customers: List[CustomerInfo]
+
+class CustomerList(BaseModel):
+    owner_org: str
+    customers: List[Customer]
