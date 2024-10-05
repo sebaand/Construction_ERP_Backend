@@ -8,10 +8,19 @@ from app.schemas.collections import TemplateCollection, AssignedSlatesCollection
 from app.services.slates_service import SlatesService
 from app.api.deps import get_slates_service
 import logging
+from bson import ObjectId
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from bson import ObjectId
+import logging
+
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
 
 @router.get("/FormData/", response_model=TemplateCollection)
 async def list_forms(
@@ -20,18 +29,6 @@ async def list_forms(
     slates_service: SlatesService = Depends(get_slates_service)
 ):
     return await slates_service.list_forms(owner_org, status)
-
-from bson import ObjectId
-from fastapi import APIRouter, Depends, HTTPException, Query
-
-from fastapi import APIRouter, Depends, HTTPException, Query
-from bson import ObjectId
-import logging
-
-router = APIRouter()
-logger = logging.getLogger(__name__)
-
-from typing import Optional
 
 @router.get("/get-template/", response_model=SlateTemplateModel)
 async def get_template(

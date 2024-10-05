@@ -81,17 +81,3 @@ class DraftSlateModel(BaseModel):
     title: str
     projectId: str
     status: str
-
-class QuoteSlateModel(BaseModel):
-    assigned_date: datetime
-    assignee: str
-    data: Dict[str, Any]
-    database_id: str
-    description: str
-    due_date: datetime
-    fields: List[FormField]
-    last_updated: datetime
-    owner_org: str
-    title: str
-    quoteId: str
-    status: str
