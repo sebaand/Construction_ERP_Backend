@@ -6,7 +6,7 @@ from .user import PlatformUsers
 from .company import Company, PricingItem
 from .crm import Customer
 from .prospect import Prospect, MergedProspect
-from .quote import MergedQuote, Quote, QuoteSlateModel
+from .quote import Quote, QuoteSlateModel
 
 
 # Projects Collections
@@ -60,7 +60,3 @@ class Quote_Data(BaseModel):
 class Quote_Complete_Data(BaseModel):
     owner_org: str
     items: List[QuoteSlateModel]
-
-class MergedQuoteData(BaseModel):
-    owner_org: str
-    items: List[MergedQuote]

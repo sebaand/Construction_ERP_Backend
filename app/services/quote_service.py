@@ -3,8 +3,8 @@ from pydantic import ValidationError
 from bson import ObjectId
 from fastapi import HTTPException
 from typing import List, Dict
-from app.schemas.quote import Quote, MergedQuote, QuoteSlateModel
-from app.schemas.collections import Quote_Data, MergedQuoteData, Quote_Complete_Data
+from app.schemas.quote import Quote, QuoteSlateModel
+from app.schemas.collections import Quote_Data, Quote_Complete_Data
 from app.services.prospect_service import Prospect_Service
 from app.services.crm_service import CRM_Service
 from uuid import uuid4
@@ -24,7 +24,7 @@ class Quote_Service:
         if Quotes:
             return Quote_Complete_Data(
                 owner_org=owner,
-                items=[Quote(**item) for item in Quotes.get("items", [])]
+                items=[QuoteSlateModel(**item) for item in Quotes.get("items", [])]
             )
         else:
             return Quote_Complete_Data(
@@ -33,7 +33,7 @@ class Quote_Service:
             )
         
 
-    async def get_merged_quote_data(self, owner: str) -> MergedQuoteData:
+    async def get_merged_quote_data(self, owner: str) -> Quote_Complete_Data:
         quotes = await self.get_quote_data(owner)
         prospects = await self.prospect_service.prospect_list(owner)  # Use instance method
         customers = await self.crm_service.customer_list(owner)  # Use instance method

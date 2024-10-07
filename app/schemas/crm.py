@@ -8,14 +8,14 @@ class Customer(BaseModel):
     contact: str
     email: str
     telephone: str
-    vat_nm: str
-    company_nm: str
+    vat_number: str
+    company_number: str
 
 class CustomerInfo(BaseModel):
     companyId: str
     company_address: str
-    vat_nm: str
-    company_nm: str
+    vat_number: str
+    company_number: str
     name: str
     telephone: str
 
