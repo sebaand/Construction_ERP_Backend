@@ -25,7 +25,6 @@ async def create_or_update_quote(quote: QuoteSlateModel):
     # Process the quote (save to database, etc.)
     ...
 
-
 @router.get("/merged-quote-data/", response_model=Quote_Complete_Data)
 async def get_merged_quote_data(
     owner: str = Query(...),

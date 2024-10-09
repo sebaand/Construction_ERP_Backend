@@ -33,32 +33,6 @@ class Quote_Service:
             )
         
 
-    async def get_merged_quote_data(self, owner: str) -> Quote_Complete_Data:
-        quotes = await self.get_quote_data(owner)
-        prospects = await self.prospect_service.prospect_list(owner)  # Use instance method
-        customers = await self.crm_service.customer_list(owner)  # Use instance method
-
-        company_lookup = {customer.companyId: customer.name for customer in customers.customers}
-        company_address_lookup = {customer.companyId: customer.company_address for customer in customers.customers}
-        project_lookup = {prospect.projectId: prospect.projectName for prospect in prospects.prospects}
-        site_address_lookup = {prospect.projectId: prospect.site_address for prospect in prospects.prospects}
-
-        merged_items = [
-            MergedQuote(
-                **quote.model_dump(),
-                companyName=company_lookup.get(quote.companyId, "Unknown"),
-                company_address=company_address_lookup.get(quote.companyId, "Unknown"),
-                projectName=project_lookup.get(quote.projectId, "Unknown"),
-                site_address=site_address_lookup.get(quote.projectId, "Unknown")
-            )
-            for quote in quotes.items
-        ]
-
-        return MergedQuoteData(
-            owner_org=owner,
-            items=merged_items
-        )
-
     async def update_quote_data(self, owner: str, quotes: Quote_Complete_Data) -> Quote_Complete_Data:
         try:
             quotes.owner_org = owner
