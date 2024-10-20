@@ -24,6 +24,7 @@ class QuoteSlateModel(BaseModel):
     projectId: str
     companyId: str  
     status: str
+    terms: str
     issue_date: datetime
     quote_number: Optional[str] = Field(default="")
     order_number: Optional[str] = Field(default="")
@@ -40,6 +41,7 @@ class QuoteSlateModel(BaseModel):
                 "projectId": "570b908e-7347-4192-b95d-7e7f80adb397",
                 "companyId": "46fa2e62-da31-4b56-af82-463c1661b02c",
                 "status": "Draft",
+                "terms": "30 Days",
                 "issue_date": "2024-10-31T00:00:00",
                 "quote_number": "1",
                 "order_number": "123456",
@@ -61,3 +63,23 @@ class QuoteSlateModel(BaseModel):
             }
         }
     
+class QuoteDownloadModel(BaseModel):
+    name: str
+    creator: Optional[str] = Field(default="")
+    last_updated: datetime
+    quoteId: str
+    projectId: str
+    companyId: str  
+    status: str
+    terms: str
+    issue_date: datetime
+    quote_number: Optional[str] = Field(default="")
+    order_number: Optional[str] = Field(default="")
+    quoteTotal: float
+    lineItems: List[LineItem]
+    companyName: str
+    company_address: str
+    site_address: str
+    telephone: str
+    vat_number: str
+    company_number: str

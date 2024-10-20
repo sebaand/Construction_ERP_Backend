@@ -3,7 +3,7 @@ from pydantic import ValidationError
 from bson import ObjectId
 from fastapi import HTTPException
 from typing import List, Dict
-from app.schemas.quote import Quote, QuoteSlateModel
+from app.schemas.quote import QuoteSlateModel
 from app.schemas.collections import Quote_Data, Quote_Complete_Data
 from app.services.prospect_service import Prospect_Service
 from app.services.crm_service import CRM_Service
@@ -18,7 +18,7 @@ class Quote_Service:
         self.crm_service = CRM_Service(client)  # Initialize CRM_Service
 
 
-
+    # service function for returning a list of all quotes associated to an owner_org
     async def get_quote_data(self, owner: str) -> Quote_Complete_Data:
         Quotes = await self.quote_details.find_one({"owner_org": owner})
         if Quotes:
@@ -31,6 +31,30 @@ class Quote_Service:
                 owner_org=owner,
                 items=[]
             )
+
+    # service function for returning a single quote associated to an owner_org
+    async def get_single_quote_data(self, owner: str, quoteId: str) -> QuoteSlateModel:
+    Quote = await self.quote_details.find_one({"owner_org": owner, "quoteId": quoteId})
+    if Quote:
+        return QuoteSlateModel(
+            Quote
+        )
+    else:
+        return Quote_Complete_Data(
+            name="",
+            creator="",
+            last_updated="",
+            quoteId="",
+            projectId="",
+            companyId="",  
+            status="",
+            terms="",
+            issue_date="",
+            quote_number="",
+            order_number="",
+            quoteTotal="",
+            lineItems="",
+        )
         
 
     async def update_quote_data(self, owner: str, quotes: Quote_Complete_Data) -> Quote_Complete_Data:
