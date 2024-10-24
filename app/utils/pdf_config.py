@@ -13,6 +13,7 @@ from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.graphics.shapes import Drawing, Rect
+from reportlab.lib import colors
 import base64
 import logging
 from datetime import datetime, timedelta
@@ -23,6 +24,43 @@ import boto3
 # Register fonts
 pdfmetrics.registerFont(TTFont('Cursive', 'DancingScript-VariableFont_wght.ttf'))
 
+# Define styles
+styles = getSampleStyleSheet()
+styles.add(ParagraphStyle(name='Right', alignment=TA_RIGHT))
+styles.add(ParagraphStyle(name='Center', alignment=TA_CENTER))
+
+# Define page configuration
+PAGE_WIDTH, PAGE_HEIGHT = 210*mm, 297*mm  # A4 size
+MARGIN = 15*mm
+
+# Define colors
+HEADER_COLOR = colors.HexColor("#CCCCCC")
+BODY_COLOR = colors.HexColor("#FFFFFF")
+TEXT_COLOR = colors.black
+
+# Define table styles
+HEADER_STYLE = [
+    ('BACKGROUND', (0, 0), (-1, 0), HEADER_COLOR),
+    ('TEXTCOLOR', (0, 0), (-1, 0), TEXT_COLOR),
+    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+    ('FONTSIZE', (0, 0), (-1, 0), 12),
+    ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+]
+
+BODY_STYLE = [
+    ('BACKGROUND', (0, 1), (-1, -1), BODY_COLOR),
+    ('TEXTCOLOR', (0, 1), (-1, -1), TEXT_COLOR),
+    ('ALIGN', (0, 1), (-1, -1), 'LEFT'),
+    ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+    ('FONTSIZE', (0, 1), (-1, -1), 10),
+    ('TOPPADDING', (0, 1), (-1, -1), 6),
+    ('BOTTOMPADDING', (0, -1), (-1, -1), 6),
+]
+
+TABLE_STYLE = HEADER_STYLE + BODY_STYLE + [
+    ('GRID', (0, 0), (-1, -1), 1, colors.black),
+]
 
 class CustomCheckbox(Flowable):
     def __init__(self, checked=False):

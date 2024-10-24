@@ -16,6 +16,14 @@ async def get_prospect_data(
 ):
     return await prospect_service.get_prospect_data(owner)
 
+@router.get("/merged-prospect-data/", response_model=MergedProspectData)
+async def get_merged_prospect_data(
+    owner: str = Query(...),
+    prospect_service: Prospect_Service = Depends(get_prospect_service)
+):
+    """Endpoint that handles the HTTP request"""
+    return await prospect_service.merge_prospect_data(owner)
+
 
 @router.get("/merged-prospect-data/", response_model=MergedProspectData)
 async def get_merged_prospect_data(

@@ -14,6 +14,7 @@ class Prospect_Service:
         self.db = client.Forms
         self.prospect_details = self.db.get_collection("Prospects")
         self.crm_details = self.db.get_collection("CRM")
+        self.crm_service = CRM_Service(client)
 
 
     async def get_prospect_data(self, owner: str) -> Prospect_Data:
@@ -30,29 +31,31 @@ class Prospect_Service:
             )
         
 
-    async def get_merged_prospect_data(self, owner: str) -> MergedProspectData:
+    async def merge_prospect_data(self, owner: str) -> MergedProspectData:
         prospects = await self.get_prospect_data(owner)
-        customers = await CRM_Service.customer_list(owner)  # Assuming you have access to crm_service
+        customers = await self.crm_service.customer_list(owner)  # Assuming you have access to crm_service
 
-        company_lookup = {customer.companyId: customer.name for customer in customers.customers}
-        company_address_lookup = {customer.companyId: customer.company_address for customer in customers.customers}
-        company_vat_lookup = {customer.companyId: customer.vat_number for customer in customers.customers}
-        company_nm_lookup = {customer.companyId: customer.company_number for customer in customers.customers}
-        telephone_lookup = {customer.companyId: customer.phone for customer in customers.customers}
+        # Create lookup dictionaries
+        lookups = {
+            'name': {c.companyId: c.name for c in customers.customers},
+            'company_address': {c.companyId: c.company_address for c in customers.customers},
+            'vat_number': {c.companyId: c.vat_number for c in customers.customers},
+            'company_number': {c.companyId: c.company_number for c in customers.customers},
+            'telephone': {c.companyId: c.telephone for c in customers.customers}
+        }
 
         merged_items = [
             MergedProspect(
                 companyId=prospect.companyId,
-                companyName=company_lookup.get(prospect.companyId, "Unknown"),
-                company_address=company_address_lookup.get(prospect.companyId, "Unknown"),
                 projectId=prospect.projectId,
                 projectName=prospect.projectName,
                 site_address=prospect.site_address,
                 status=prospect.status,
-                company_number=company_nm_lookup.get(prospect.companyId, "Unknown"),
-                vat_number=company_vat_lookup.get(prospect.companyId, "Unknown"),
-                telephone=telephone_lookup.get(prospect.companyId, "Unknown"),
-                # Add other fields as needed
+                companyName=lookups['name'].get(prospect.companyId, "Unknown"),
+                company_address=lookups['company_address'].get(prospect.companyId, "Unknown"),
+                company_number=lookups['company_number'].get(prospect.companyId, "Unknown"),
+                vat_number=lookups['vat_number'].get(prospect.companyId, "Unknown"),
+                telephone=lookups['telephone'].get(prospect.companyId, "Unknown"),
             )
             for prospect in prospects.items
         ]

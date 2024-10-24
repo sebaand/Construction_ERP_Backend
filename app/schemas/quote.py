@@ -77,6 +77,7 @@ class QuoteDownloadModel(BaseModel):
     order_number: Optional[str] = Field(default="")
     quoteTotal: float
     lineItems: List[LineItem]
+    projectName: str
     companyName: str
     company_address: str
     site_address: str
