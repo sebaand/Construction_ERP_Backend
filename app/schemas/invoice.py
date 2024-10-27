@@ -22,9 +22,6 @@ class InvoiceSlateModel(BaseModel):
     terms: str
     issue_date: datetime
     cis_reversal: bool
-    quote_number: Optional[str] = Field(default="")
-    invoice_number: Optional[str] = Field(default="")
-    order_number: Optional[str] = Field(default="")
     invoiceTotal: float
     lineItems: List[LineItem]
 
@@ -76,7 +73,6 @@ class InvoiceDownloadModel(BaseModel):
     issue_date: datetime
     quote_number: Optional[str] = Field(default="")
     order_number: Optional[str] = Field(default="")
-    invoice_number: Optional[str] = Field(default="")
     cis_reversal: bool
     invoiceTotal: float
     lineItems: List[LineItem]
