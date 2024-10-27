@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 # # # # # # # All GET Routes # # # # # # # # # #
 # # # # # # # # # # # # # # # # # # # # # # # # #
+
 # Collect all quotes for an owner ID
 @router.get("/quote-details/", response_model=Quote_Complete_Data)
 async def get_quote_data(
@@ -35,57 +36,7 @@ async def get_single_quote_data(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
-
-# @router.get("/download/")
-# async def download_quote(
-#     quoteId: str = Query(...),
-#     owner: str = Query(...),
-#     quote_service: Quote_Service = Depends(get_quote_service),
-#     prospect_service: Prospect_Service = Depends(get_prospect_service)
-# ):
-#     try:
-#         # Get merged quote data
-#         quote_data = await get_merged_quote_data(owner, quoteId, prospect_service, quote_service)
-        
-#         # Generate PDF
-#         pdf_buffer = generate_quote_pdf(quote_data)
-        
-#         # Return StreamingResponse
-#         return StreamingResponse(
-#             pdf_buffer,
-#             media_type="application/pdf",
-#             headers={"Content-Disposition": f"attachment; filename=quote_{quoteId}.pdf"}
-#         )
-#     except HTTPException as e:
-#         raise e
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
-
-
-# # Helper function to get merged quote data
-# async def get_merged_quote_data(owner, quoteId, prospect_service, quote_service):
-#     quote = await quote_service.get_single_quote_data(owner, quoteId)
-#     prospects = await prospect_service.get_merged_prospect_data(owner)
-
-#     # Create lookup dictionaries
-#     lookups = {
-#         'name': {p.companyId: p.name for p in prospects.prospects},
-#         'company_address': {p.companyId: p.company_address for p in prospects.prospects},
-#         'site_address': {p.companyId: p.site_address for p in prospects.prospects},
-#         'vat_number': {p.companyId: p.vat_number for p in prospects.prospects},
-#         'company_number': {p.companyId: p.company_number for p in prospects.prospects},
-#         'telephone': {p.companyId: p.telephone for p in prospects.prospects},
-#     }
-
-#     return QuoteDownloadModel(
-#         **quote.dict(),
-#         companyName=lookups['name'].get(quote.companyId, "Unknown"),
-#         company_address=lookups['company_address'].get(quote.companyId, "Unknown"),
-#         site_address=lookups['site_address'].get(quote.companyId, "Unknown"),
-#         vat_number=lookups['vat_number'].get(quote.companyId, "Unknown"),
-#         company_number=lookups['company_number'].get(quote.companyId, "Unknown"),
-#         telephone=lookups['telephone'].get(quote.companyId, "Unknown"),
-#     )
+# route for sending the download request for the selected quote
 @router.get("/download/")
 async def download_quote(
     quoteId: str = Query(...),
@@ -137,16 +88,6 @@ async def get_merged_quote_data(owner: str, quoteId: str, prospect_service: Pros
 
 # # # # # # # All POST Routes # # # # # # # # # #
 # # # # # # # # # # # # # # # # # # # # # # # # #
-# Route for posting adding or updating a single quote associated with an owner_org
-@router.post("/quotes/")
-async def create_or_update_quote(quote: QuoteSlateModel):
-    if quote.status == "Finalized":
-        # Perform additional validation for finalized quotes
-        if not all([quote.assignee, quote.due_date, quote.order_number]):
-            raise HTTPException(status_code=400, detail="All fields must be filled for finalized quotes")
-    # Process the quote (save to database, etc.)
-    ...
-
 # Route for posting adding or updating all quotes associated with an owner_org
 @router.post("/quote-details/", response_model=Quote_Complete_Data)
 async def update_quote_data(

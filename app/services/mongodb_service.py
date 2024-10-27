@@ -3,7 +3,7 @@ from bson import ObjectId
 from fastapi import HTTPException
 from typing import List, Dict
 
-class MongoDBService:
+class MongoDB_Service:
     def __init__(self, client: AsyncIOMotorClient):
         self.db = client.Forms
         self.platform_users = self.db.get_collection("Users")

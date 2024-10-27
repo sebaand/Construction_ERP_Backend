@@ -7,7 +7,7 @@ from botocore.exceptions import ClientError
 
 logger = logging.getLogger(__name__)
 
-class FileService:
+class File_Service:
     def __init__(self):
         self.spaces_client = spaces_client
 

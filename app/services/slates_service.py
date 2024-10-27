@@ -8,7 +8,7 @@ from typing import Optional
 from app.schemas.slate import CreateTemplateModel, AssignSlateModel, SlateTemplateModel, SubmitSlateModel
 from app.schemas.collections import TemplateCollection, AssignedSlatesCollection
 
-class SlatesService:
+class Slates_Service:
     def __init__(self, client: AsyncIOMotorClient):
         self.db = client.Forms
         self.assigned_slates = self.db.get_collection("Assigned_Slates")

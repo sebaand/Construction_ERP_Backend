@@ -7,7 +7,7 @@ from typing import List, Dict
 from datetime import datetime, timedelta
 from app.schemas.dashboard import DashboardItem
 
-class DashboardService:
+class Dashboard_Service:
     def __init__(self, client: AsyncIOMotorClient):
         self.db = client.Forms
         self.assigned_slates = self.db.get_collection("Assigned_Slates")

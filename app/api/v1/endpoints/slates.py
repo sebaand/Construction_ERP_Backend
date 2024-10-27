@@ -5,7 +5,7 @@ from typing import List
 from bson import ObjectId
 from app.schemas.slate import CreateTemplateModel, AssignSlateModel, SlateTemplateModel
 from app.schemas.collections import TemplateCollection, AssignedSlatesCollection
-from app.services.slates_service import SlatesService
+from app.services.slates_service import Slates_Service
 from app.api.deps import get_slates_service
 import logging
 from bson import ObjectId
@@ -26,7 +26,7 @@ router = APIRouter()
 async def list_forms(
     owner_org: str,
     status: bool,
-    slates_service: SlatesService = Depends(get_slates_service)
+    slates_service: Slates_Service = Depends(get_slates_service)
 ):
     return await slates_service.list_forms(owner_org, status)
 
@@ -34,7 +34,7 @@ async def list_forms(
 async def get_template(
     owner: Optional[str] = Query(None),
     templateId: Optional[str] = Query(None),
-    slates_service: SlatesService = Depends(get_slates_service)
+    slates_service: Slates_Service = Depends(get_slates_service)
 ):
     logger.info(f"Received request for template: owner={owner}, templateId={templateId}")
     
@@ -58,21 +58,21 @@ async def get_template(
 async def list_user_slates(
     assignee: str,
     status: bool,
-    slates_service: SlatesService = Depends(get_slates_service)
+    slates_service: Slates_Service = Depends(get_slates_service)
 ):
     return await slates_service.list_user_slates(assignee, status)
 
 @router.post("/create-slate/")
 async def create_slate(
     slate: CreateTemplateModel = Body(...),
-    slates_service: SlatesService = Depends(get_slates_service)
+    slates_service: Slates_Service = Depends(get_slates_service)
 ):
     return await slates_service.create_slate(slate)
 
 @router.post("/assign-slate/")
 async def assign_slate(
     slate: AssignSlateModel = Body(...),
-    slates_service: SlatesService = Depends(get_slates_service)
+    slates_service: Slates_Service = Depends(get_slates_service)
 ):
     return await slates_service.assign_slate(slate)
 
@@ -80,7 +80,7 @@ async def assign_slate(
 async def update_slate(
     form_id: str,
     slate_data: dict = Body(...),
-    slates_service: SlatesService = Depends(get_slates_service)
+    slates_service: Slates_Service = Depends(get_slates_service)
 ):
     return await slates_service.update_slate(form_id, slate_data)
 
@@ -88,21 +88,21 @@ async def update_slate(
 async def update_slate_template(
     template_id: str,
     slate: CreateTemplateModel = Body(...),
-    slates_service: SlatesService = Depends(get_slates_service)
+    slates_service: Slates_Service = Depends(get_slates_service)
 ):
     return await slates_service.update_slate_template(template_id, slate)
 
 @router.delete("/delete-slate/{slate_id}")
 async def delete_slate_template(
     slate_id: str,
-    slates_service: SlatesService = Depends(get_slates_service)
+    slates_service: Slates_Service = Depends(get_slates_service)
 ):
     return await slates_service.delete_slate_template(slate_id)
 
 @router.get("/org-slates/", response_model=AssignedSlatesCollection)
 async def list_org_slates(
     owner_org: str,
-    slates_service: SlatesService = Depends(get_slates_service)
+    slates_service: Slates_Service = Depends(get_slates_service)
 ):
     return await slates_service.list_org_slates(owner_org)
 

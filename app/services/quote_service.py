@@ -49,47 +49,6 @@ class Quote_Service:
             # If no document found for the owner, return an empty quote or raise an exception
             raise HTTPException(status_code=404, detail=f"No quotes found for owner {owner}")
         
-
-    # # Function for returning the merged quote+prospect data
-    # async def get_merged_prospect_data(self, owner: str) -> QuoteDownloadModel:
-
-    #     # Retrieved quote data to download
-    #     quote = await self.get_single_quote_data(owner)
-
-    #     # Retrieving merged prospects for cross matching to quote
-    #     prospects = await Prospect_Service.get_merged_prospect_data(owner)
-
-    #     # Create a lookup dictionary for info from Prospects
-    #     company_lookup = {prospect.companyId: prospect.name for prospect in prospects.prospects}
-    #     company_address_lookup = {prospect.companyId: prospect.company_address for prospect in prospects.prospects}
-    #     site_address_lookup = {prospect.companyId: prospect.site_address for prospect in prospects.prospects}
-    #     company_vat_lookup = {prospect.companyId: prospect.vat_number for prospect in prospects.prospects}
-    #     company_number_lookup = {prospect.companyId: prospect.company_number for prospect in prospects.prospects}
-    #     telephone_lookup = {prospect.companyId: prospect.telephone for prospect in prospects.prospects}
-
-    #     return QuoteDownloadModel(
-    #         name=quote.name,
-    #         creator=quote.creator,
-    #         last_updated=quote.last_updated,
-    #         quoteId=quote.quoteId,
-    #         projectId=quote.projectId,
-    #         companyId=quote.companyId,
-    #         status=quote.status,
-    #         terms=quote.terms,
-    #         issue_date=quote.issue_date,
-    #         quote_number=quote.quote_number,
-    #         order_number=quote.order_number,
-    #         quoteTotal=quote.quoteTotal,
-    #         lineItems=quote.lineItems,
-    #         companyName=company_lookup.get(quote.companyId, "Unknown"),
-    #         company_address=company_address_lookup.get(quote.companyId, "Unknown"),
-    #         site_address=site_address_lookup.get(quote.companyId, "Unknown"),
-    #         company_number=company_number_lookup.get(quote.companyId, "Unknown"),
-    #         vat_number=company_vat_lookup.get(quote.companyId, "Unknown"),
-    #         telephone=telephone_lookup.get(quote.companyId, "Unknown"),
-    #         # Add other fields as needed
-    #     )
-        
         
     # function for both updating the quote data of an existing quote or adding a new one
     async def update_quote_data(self, owner: str, quotes: Quote_Complete_Data) -> Quote_Complete_Data:

@@ -1,65 +1,104 @@
 from motor.motor_asyncio import AsyncIOMotorClient
-from fastapi import HTTPException
-from app.schemas.project import Projects
-from app.schemas.slate import CreateTemplateModel, AssignSlateModel, SlateTemplateModel, SubmitSlateModel
-from app.schemas.collections import ProjectsCollection, TemplateCollection, AssignedSlatesCollection
-from app.schemas.invoice import Invoice
+from pydantic import ValidationError
 from bson import ObjectId
+from fastapi import HTTPException
+from typing import List, Dict
+from app.schemas.invoice import InvoiceSlateModel, InvoiceDownloadModel
+from app.schemas.collections import Invoice_Complete_Data
+from app.services.company_service import Company_Service
+from app.services.prospect_service import Prospect_Service
+from app.services.crm_service import CRM_Service
+from uuid import uuid4
+from datetime import datetime
 
-class InvoiceService:
+class Invoice_Service:
     def __init__(self, client: AsyncIOMotorClient):
         self.db = client.Forms
-        self.assigned_slates = self.db.get_collection("Assigned_Slates")
-        self.projects = self.db.get_collection("Projects")
-        self.templates = self.db.get_collection("Templates")
+        self.invoice_details = self.db.get_collection("Invoices")
+        self.company_service = Company_Service(client)  # Initialize Company_Service
+        self.prospect_service = Prospect_Service(client)  # Initialize Prospect_Service
+        self.crm_service = CRM_Service(client)  # Initialize CRM_Service
 
-    async def get_invoice_data(self, slate_id: str) -> Invoice:
-        # Convert string ID to ObjectId
-        object_id = ObjectId(slate_id)
-        
-        # Find the slate in the Assigned_Slates collection
-        slate_data = await self.assigned_slates.find_one({"_id": object_id})
-        
-        if not slate_data:
-            raise HTTPException(status_code=404, detail="Slate not found")
-        
-        # Check if the slate is named "invoice"
-        if slate_data.get("name", "").lower() != "invoice":
-            raise HTTPException(status_code=400, detail="Requested slate is not an invoice")
-        
-        # Convert slate data to Invoice schema
-        try:
-            invoice_data = Invoice(
-                invoice_number=str(slate_data["_id"]),
-                issue_date=slate_data.get("created_at"),
-                due_date=slate_data.get("due_date"),
-                customer_name=slate_data.get("customer_name"),
-                customer_address=slate_data.get("customer_address"),
-                company_name=slate_data.get("company_name"),
-                company_address=slate_data.get("company_address"),
-                items=slate_data.get("items", []),
-                total=slate_data.get("total"),
-                job_name=slate_data.get("job_name"),
-                project_number=slate_data.get("project_number"),
-                created_by=slate_data.get("created_by"),
-                order_number=slate_data.get("order_number"),
-                company_phone=slate_data.get("company_phone"),
-                company_email=slate_data.get("company_email"),
-                vat_number=slate_data.get("vat_number"),
-                company_number=slate_data.get("company_number"),
-                bank_address=slate_data.get("bank_address"),
-                sort_code=slate_data.get("sort_code"),
-                account_number=slate_data.get("account_number")
+
+    # service function for returning a list of all invoices associated to an owner_org
+    async def get_invoice_data(self, owner: str) -> Invoice_Complete_Data:
+        Invoices = await self.invoice_details.find_one({"owner_org": owner})
+        if Invoices:
+            return Invoice_Complete_Data(
+                owner_org=owner,
+                items=[InvoiceSlateModel(**item) for item in Invoices.get("items", [])]
             )
-        except ValueError as e:
-            raise HTTPException(status_code=500, detail=f"Error processing invoice data: {str(e)}")
+        else:
+            return Invoice_Complete_Data(
+                owner_org=owner,
+                items=[]
+            )
+
+    # service function for returning a single invoice associated to an owner_org
+    async def get_single_invoice_data(self, owner: str, invoiceId: str) -> InvoiceSlateModel:
+        # Query for the document containing the owner's invoices
+        owner_invoices = await self.invoice_details.find_one({"owner_org": owner})
         
-        return invoice_data
+        if owner_invoices:
+            # Search for the specific invoice in the items list
+            for invoice in owner_invoices.get("items", []):
+                if invoice.get("invoiceId") == invoiceId:
+                    return InvoiceSlateModel(**invoice)
+            
+            # If the loop completes without finding the invoice, it doesn't exist
+            raise HTTPException(status_code=404, detail=f"Quote with ID {invoiceId} not found")
+        else:
+            # If no document found for the owner, return an empty invoice or raise an exception
+            raise HTTPException(status_code=404, detail=f"No invoices found for owner {owner}")
+        
+        
+    # function for both updating the invoice data of an existing invoice or adding a new one
+    async def update_invoice_data(self, owner: str, invoices: Invoice_Complete_Data) -> Invoice_Complete_Data:
+        try:
+            invoices.owner_org = owner
+            updated_items = []
+            for item in invoices.items:
+                if not item.invoiceId:
+                    item.invoiceId = str(uuid4())
+                item.last_updated = datetime.utcnow()
+                updated_items.append(item)
 
-    async def generate_invoice_pdf(self, slate_id: str):
-        invoice_data = await self.get_invoice_data(slate_id)
-        # Here you would call your PDF generation function
-        # For now, we'll just return the invoice data
-        return invoice_data.model_dump()
+            validated_data = Invoice_Complete_Data(
+                owner_org=owner,
+                items=updated_items
+            )
 
-    # Add other invoice-related methods here as needed
+            update_data = validated_data.model_dump()
+
+            result = await self.invoice_details.replace_one(
+                {"owner_org": owner},
+                update_data,
+                upsert=True
+            )
+
+            if result.modified_count == 0 and result.upserted_id is None:
+                raise HTTPException(status_code=400, detail="Failed to update invoice details")
+
+            return validated_data
+        except ValidationError as e:
+            raise HTTPException(status_code=422, detail=e.errors())
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+        
+
+    # Function for setting the invoice status to archived
+    async def archive_invoice(self, owner: str, invoiceId: str) -> None:
+        result = await self.invoice_details.update_one(
+            {"owner_org": owner, "items.invoiceId": invoiceId},
+            {"$set": {"items.$.status": "Archived"}}
+        )
+
+        if result.modified_count == 0:
+            raise HTTPException(status_code=404, detail="Quote not found or already archived")
+
+        # Fetch and return the updated document
+        updated_doc = await self.invoice_details.find_one({"owner_org": owner})
+        if not updated_doc:
+            raise HTTPException(status_code=404, detail="Updated document not found")
+        
+        return InvoiceSlateModel(**updated_doc)

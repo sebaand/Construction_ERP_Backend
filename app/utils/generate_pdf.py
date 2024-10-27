@@ -150,7 +150,7 @@ def generate_quote_pdf(quote_data):
         pagesize=A4,
         leftMargin=MARGIN,
         rightMargin=MARGIN,
-        topMargin=MARGIN,
+        topMargin=2 * mm,
         bottomMargin=MARGIN
     )
     
@@ -216,8 +216,8 @@ def generate_quote_pdf(quote_data):
     # Add the header table to elements
     elements.append(header_table)
     
-    # Spacer after header
-    elements.append(Spacer(1, 5 * mm))  # 5mm space
+    # # Spacer after header
+    # elements.append(Spacer(1, 5 * mm))  # 5mm space
     
     # ---------------------------
     # Project and Quote Information

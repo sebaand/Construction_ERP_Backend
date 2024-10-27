@@ -8,7 +8,7 @@ from app.schemas.project import Projects
 from app.schemas.collections import ProjectsCollection
 import uuid
 
-class ProjectService:
+class Project_Service:
     def __init__(self, client: AsyncIOMotorClient):
         self.db = client.Forms
         self.projects = self.db.get_collection("Projects")

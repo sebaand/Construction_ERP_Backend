@@ -8,7 +8,7 @@ from app.schemas.user import PlatformUsers, UserData
 from app.schemas.early_bird import EarlyBird
 from app.schemas.collections import UsersCollection
 
-class UserService:
+class User_Service:
     def __init__(self, client: AsyncIOMotorClient):
         self.db = client.Forms
         self.platform_users = self.db.get_collection("Users")

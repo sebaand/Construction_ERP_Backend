@@ -2,7 +2,7 @@
 
 import logging
 from fastapi import APIRouter, Depends, HTTPException
-from app.services.file_service import FileService
+from app.services.file_service import File_Service
 from app.api.deps import get_file_service
 
 router = APIRouter()
@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 @router.get("/privacy-notice-url")
 async def get_privacy_notice_url(
-    file_service: FileService = Depends(get_file_service)
+    file_service: File_Service = Depends(get_file_service)
 ):
     try:
         url = await file_service.get_privacy_notice_url()

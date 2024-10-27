@@ -3,7 +3,7 @@ from typing import List
 from bson import ObjectId
 from app.schemas.user import PlatformUsers
 from app.schemas.collections import UsersCollection
-from app.services.mongodb_service import MongoDBService
+from app.services.mongodb_service import MongoDB_Service
 from app.api.deps import get_mongodb_service
 
 router = APIRouter()
@@ -11,7 +11,7 @@ router = APIRouter()
 @router.get("/", response_model=UsersCollection)
 async def list_team_users(
     owner: str = Query(...),
-    mongodb_service: MongoDBService = Depends(get_mongodb_service)
+    mongodb_service: MongoDB_Service = Depends(get_mongodb_service)
 ):
     return await mongodb_service.list_team_users(owner)
 
@@ -19,7 +19,7 @@ async def list_team_users(
 async def add_user(
     email: str,
     user_fields: dict = Body(...),
-    mongodb_service: MongoDBService = Depends(get_mongodb_service)
+    mongodb_service: MongoDB_Service = Depends(get_mongodb_service)
 ):
     return await mongodb_service.add_user(email, user_fields)
 
@@ -27,7 +27,7 @@ async def add_user(
 async def update_team_users(
     email: str,
     updated_fields: dict = Body(...),
-    mongodb_service: MongoDBService = Depends(get_mongodb_service)
+    mongodb_service: MongoDB_Service = Depends(get_mongodb_service)
 ):
     return await mongodb_service.update_team_user(email, updated_fields)
 
@@ -35,6 +35,6 @@ async def update_team_users(
 async def remove_team_users(
     premium_key: str,
     database_ids: List[str] = Body(...),
-    mongodb_service: MongoDBService = Depends(get_mongodb_service)
+    mongodb_service: MongoDB_Service = Depends(get_mongodb_service)
 ):
     return await mongodb_service.remove_team_users(database_ids, premium_key)

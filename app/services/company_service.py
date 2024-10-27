@@ -6,7 +6,7 @@ from typing import List, Dict
 from app.schemas.company import Company, Payment, PricingItem
 from app.schemas.collections import PricingData
 
-class CompanyService:
+class Company_Service:
     def __init__(self, client: AsyncIOMotorClient):
         self.db = client.Forms
         self.company_details = self.db.get_collection("Company_Details")

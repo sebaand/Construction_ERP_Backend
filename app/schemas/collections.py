@@ -7,6 +7,7 @@ from .company import Company, PricingItem
 from .crm import Customer
 from .prospect import Prospect, MergedProspect
 from .quote import Quote, QuoteSlateModel, QuoteDownloadModel
+from .invoice import InvoiceSlateModel, InvoiceDownloadModel
 
 # Projects Collections
 class ProjectsCollection(BaseModel):
@@ -62,4 +63,13 @@ class Quote_Complete_Data(BaseModel):
 class MergedQuoteData(BaseModel):
     owner_org: str
     items: List[QuoteDownloadModel]
+
+# Invoice Collections
+class Invoice_Complete_Data(BaseModel):
+    owner_org: str
+    items: List[InvoiceSlateModel]
+
+class MergedInvoiceData(BaseModel):
+    owner_org: str
+    items: List[InvoiceDownloadModel]
 
