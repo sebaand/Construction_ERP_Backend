@@ -11,7 +11,7 @@ class LineItem(BaseModel):
 
 class InvoiceSlateModel(BaseModel):
     name: str
-    work_description: str
+    work_description: Optional[str] = Field(default="")
     creator: Optional[str] = Field(default="")
     last_updated: datetime
     invoiceId: str
