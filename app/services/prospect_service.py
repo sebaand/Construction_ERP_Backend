@@ -37,8 +37,8 @@ class Prospect_Service:
 
         # Create lookup dictionaries
         lookups = {
-            'name': {c.companyId: c.name for c in customers.customers},
-            'company_address': {c.companyId: c.company_address for c in customers.customers},
+            'customer_name': {c.companyId: c.customer_name for c in customers.customers},
+            'customer_address': {c.companyId: c.customer_address for c in customers.customers},
             'vat_number': {c.companyId: c.vat_number for c in customers.customers},
             'company_number': {c.companyId: c.company_number for c in customers.customers},
             'telephone': {c.companyId: c.telephone for c in customers.customers}
@@ -51,8 +51,8 @@ class Prospect_Service:
                 projectName=prospect.projectName,
                 site_address=prospect.site_address,
                 status=prospect.status,
-                companyName=lookups['name'].get(prospect.companyId, "Unknown"),
-                company_address=lookups['company_address'].get(prospect.companyId, "Unknown"),
+                companyName=lookups['customer_name'].get(prospect.companyId, "Unknown"),
+                company_address=lookups['customer_address'].get(prospect.companyId, "Unknown"),
                 company_number=lookups['company_number'].get(prospect.companyId, "Unknown"),
                 vat_number=lookups['vat_number'].get(prospect.companyId, "Unknown"),
                 telephone=lookups['telephone'].get(prospect.companyId, "Unknown"),

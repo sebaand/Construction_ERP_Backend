@@ -3,8 +3,8 @@ from typing import List
 
 class Customer(BaseModel):
     companyId: str
-    name: str
-    company_address: str
+    customer_name: str
+    customer_address: str
     contact: str
     email: str
     telephone: str
@@ -13,10 +13,10 @@ class Customer(BaseModel):
 
 class CustomerInfo(BaseModel):
     companyId: str
-    company_address: str
+    customer_name: str
+    customer_address: str
     vat_number: str
     company_number: str
-    name: str
     telephone: str
 
 class CustomerNamesList(BaseModel):

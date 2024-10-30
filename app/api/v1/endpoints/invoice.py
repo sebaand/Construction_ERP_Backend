@@ -73,6 +73,7 @@ async def get_merged_invoice_data(owner: str, invoiceId: str, prospect_service: 
     try:
         invoice = await invoice_service.get_single_invoice_data(owner, invoiceId)
         merged_data = await prospect_service.merge_prospect_data(owner)
+        company_details = await company_service.get_company_details(owner)
         payment_data = await company_service.get_payment_details(owner)
         
         # Use the merged data to create the invoice download model

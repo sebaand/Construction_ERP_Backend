@@ -30,7 +30,7 @@ class CRM_Service:
         crm_data = await self.crm_details.find_one({"owner_org": owner})
         if crm_data:
             customers = [
-                CustomerInfo(companyId=item.get("companyId", ""), name=item.get("name", ""), company_address=item.get("company_address", ""), vat_number=item.get("vat_number", ""), company_number=item.get("company_number", ""), telephone=item.get("telephone", ""))
+                CustomerInfo(companyId=item.get("companyId", ""), customer_name=item.get("customer_name", ""), customer_address=item.get("customer_address", ""), vat_number=item.get("vat_number", ""), company_number=item.get("company_number", ""), telephone=item.get("telephone", ""))
                 for item in crm_data.get("items", [])
             ]
             return CustomerNamesList(

@@ -78,9 +78,14 @@ class QuoteDownloadModel(BaseModel):
     quoteTotal: float
     lineItems: List[LineItem]
     projectName: str
-    companyName: str
-    company_address: str
+    customer_name: str
+    customer_address: str
     site_address: str
     telephone: str
     vat_number: str
     company_number: str
+    companyName: str
+    companyAddress: str  
+    companyVat: str
+    companyEmail: str
+    companyTelephone: str

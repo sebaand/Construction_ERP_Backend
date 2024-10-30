@@ -36,8 +36,8 @@ def generate_invoice_pdf(invoice_data, buffer):
     
     # Customer and Company Info
     info_data = [
-        [Paragraph(f"<b>Customer:</b><br/>{invoice_data['customer_name']}<br/>{invoice_data['customer_address']}", styles['Normal']),
-         Paragraph(f"<b>Company:</b><br/>{invoice_data['company_name']}<br/>{invoice_data['company_address']}", styles['Normal'])],
+        [Paragraph(f"<b>Site:</b><br/>{invoice_data['customer_address']}", styles['Normal']),
+         Paragraph(f"<b>Quote To:</b><br/>{invoice_data['customer_name']}<br/>{invoice_data['company_address']}", styles['Normal'])],
     ]
     info_table = Table(info_data, colWidths=[doc.width/2]*2)
     info_table.setStyle(TableStyle([
@@ -82,60 +82,6 @@ def generate_invoice_pdf(invoice_data, buffer):
     return buffer
 
 # # Function for generating a downloadable quote
-# def generate_quote_pdf(quote_data):
-#     buffer = BytesIO()
-#     doc = SimpleDocTemplate(buffer, pagesize=A4, 
-#                             leftMargin=MARGIN, rightMargin=MARGIN,
-#                             topMargin=MARGIN, bottomMargin=MARGIN)
-    
-#     elements = []
-    
-#     # Header
-#     elements.append(Paragraph(f"Project: {quote_data.projectName}", styles['Heading1']))
-#     elements.append(Paragraph(f"Quote #{quote_data.quote_number} - {quote_data.name}", styles['Heading2']))
-#     elements.append(Spacer(1, 10*mm))
-    
-#     # Customer and Company Info
-#     info_data = [
-#         [Paragraph(f"<b>Customer:</b><br/>{quote_data.companyName}<br/>{quote_data.site_address}", styles['Normal']),
-#          Paragraph(f"<b>Company:</b><br/>{quote_data.companyName}<br/>{quote_data.company_address}<br/>Telephone: {quote_data.telephone}<br/>VAT: {quote_data.vat_number}<br/>Company Number: {quote_data.company_number}", styles['Normal'])],
-#     ]
-#     info_table = Table(info_data, colWidths=[(PAGE_WIDTH - 2*MARGIN)/2]*2)
-#     info_table.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'TOP')]))
-#     elements.append(info_table)
-#     elements.append(Spacer(1, 10*mm))
-    
-#     # Quote Details
-#     details_data = [
-#         ['Item', 'Quantity', 'Units', 'Price', 'Total'],
-#     ]
-#     for item in quote_data.lineItems:
-#         details_data.append([
-#             item.lineItem,
-#             f"{int(item.quantity)}",  # Format quantity as whole number
-#             item.units,
-#             f"£{'{:,.2f}'.format(item.pricePerUnit)}",  # Add thousands separator
-#             f"£{'{:,.2f}'.format(item.quantity * item.pricePerUnit)}"  # Add thousands separator
-#         ])
-    
-#     details_table = Table(details_data, colWidths=[(PAGE_WIDTH - 2*MARGIN)/5]*5)
-#     details_table.setStyle(TableStyle(TABLE_STYLE))
-#     elements.append(details_table)
-    
-#     # Total
-#     elements.append(Spacer(1, 10*mm))
-#     elements.append(Paragraph(f"Total: £{'{:,.2f}'.format(quote_data.quoteTotal)}", styles['Right']))  # Add thousands separator
-    
-#     # Terms
-#     if quote_data.terms:
-#         elements.append(Spacer(1, 10*mm))
-#         elements.append(Paragraph("Terms and Conditions:", styles['Heading3']))
-#         elements.append(Paragraph(quote_data.terms, styles['Normal']))
-    
-#     # Build PDF
-#     doc.build(elements)
-#     buffer.seek(0)
-#     return buffer
 def generate_quote_pdf(quote_data):
     # Create a buffer to hold the PDF data
     buffer = BytesIO()
@@ -160,6 +106,7 @@ def generate_quote_pdf(quote_data):
     # Get predefined styles and add custom styles if necessary
     styles = getSampleStyleSheet()
     styles.add(ParagraphStyle(name='Right', alignment=TA_RIGHT))
+    styles.add(ParagraphStyle(name='CompanyInfo', parent=styles['Normal'], fontSize=10, leading=12))
     
     # ---------------------------
     # Header Section with Logo
@@ -185,12 +132,26 @@ def generate_quote_pdf(quote_data):
     except IOError:
         # If the logo image is not found, use a placeholder text
         logo = Paragraph("Logo Not Found", styles['Normal'])
+        logo.drawWidth = 100  # Assign a default width for the placeholder
+        logo.drawHeight = 20 * mm  # Assign a default height for the placeholder
+
+
+    # Prepare company information as HTML-formatted string
+    company_info = f"""
+        {quote_data.companyName}<br/>
+        {quote_data.companyAddress}<br/>
+        VAT: {quote_data.companyVat}<br/>
+        Email: {quote_data.companyEmail}<br/>
+        Tel: {quote_data.companyTelephone}<br/>
+    """
+    # Create a paragraph for the company info using the 'CompanyInfo' style
+    company_info_para = Paragraph(company_info, styles['CompanyInfo'])
     
     # Create a two-column table for the header
     # Left column can hold additional header info or remain empty
     # Right column holds the logo
     header_data = [
-        ['', logo]  # Empty string for left cell, logo for right cell
+        [company_info_para, logo]  # Empty string for left cell, logo for right cell
     ]
     
     # Define column widths
@@ -217,7 +178,7 @@ def generate_quote_pdf(quote_data):
     elements.append(header_table)
     
     # # Spacer after header
-    # elements.append(Spacer(1, 5 * mm))  # 5mm space
+    elements.append(Spacer(1, 10 * mm))  # 5mm space
     
     # ---------------------------
     # Project and Quote Information
@@ -240,26 +201,25 @@ def generate_quote_pdf(quote_data):
     
     # Prepare customer information
     customer_info = f"""
-        <b>Customer:</b><br/>
-        {quote_data.companyName}<br/>
-        {quote_data.site_address}
+        <b>Quote To:</b><br/>
+        {quote_data.customer_name}<br/>
+        {quote_data.customer_address}<br/>
+        {quote_data.telephone}<br/>
+        {quote_data.vat_number}<br/>
+        {quote_data.company_number}
     """
-    
-    # Prepare company information
-    company_info = f"""
-        <b>Company:</b><br/>
-        {quote_data.companyName}<br/>
-        {quote_data.company_address}<br/>
-        Telephone: {quote_data.telephone}<br/>
-        VAT: {quote_data.vat_number}<br/>
-        Company Number: {quote_data.company_number}
+
+    # Prepare site information
+    site_info = f"""
+        <b>Project Site:</b><br/>
+        {quote_data.site_address}
     """
     
     # Create a table with two columns: Customer and Company Info
     info_data = [
         [
             Paragraph(customer_info, styles['Normal']),
-            Paragraph(company_info, styles['Normal'])
+            Paragraph(site_info, styles['Normal'])
         ]
     ]
     

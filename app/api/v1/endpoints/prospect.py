@@ -35,8 +35,8 @@ async def get_merged_prospect_data(
     customers = await crm_service.customer_list(owner)
 
     # Create a lookup dictionary for info from CRM
-    company_lookup = {customer.companyId: customer.name for customer in customers.customers}
-    company_address_lookup = {customer.companyId: customer.company_address for customer in customers.customers}
+    company_lookup = {customer.companyId: customer.customer_name for customer in customers.customers}
+    company_address_lookup = {customer.companyId: customer.customer_address for customer in customers.customers}
     company_vat_lookup = {customer.companyId: customer.vat_number for customer in customers.customers}
     company_nm_lookup = {customer.companyId: customer.company_number for customer in customers.customers}
     telephone_lookup = {customer.companyId: customer.telephone for customer in customers.customers}

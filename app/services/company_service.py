@@ -5,6 +5,7 @@ from fastapi import HTTPException
 from typing import List, Dict
 from app.schemas.company import Company, Payment, PricingItem
 from app.schemas.collections import PricingData
+from uuid import uuid4
 
 class Company_Service:
     def __init__(self, client: AsyncIOMotorClient):
@@ -18,13 +19,11 @@ class Company_Service:
         if company_data:
             return Company(**company_data)
         else:
-            return Company(owner_org=owner, name="", address="", vat="", email="", telephone="")
+            return Company(owner_org=owner, companyName="", companyAddress="", companyVat="", companyEmail="", companyTelephone="", companyId="")
 
     async def update_company_details(self, owner: str, company_data: Company) -> Company:
         company_dict = company_data.model_dump()
         company_dict["owner_org"] = owner  # Ensure the owner is set correctly
-        print('owner', owner)
-        print('company_data', company_data)
         try:
             # Check if an entry exists
             existing_entry = await self.company_details.find_one({"owner_org": owner})
@@ -39,6 +38,7 @@ class Company_Service:
                     raise HTTPException(status_code=400, detail="Failed to update company details")
             else:
                 # Insert new entry
+                company_dict["companyId"] = str(uuid4())
                 result = await self.company_details.insert_one(company_dict)
                 if not result.inserted_id:
                     raise HTTPException(status_code=400, detail="Failed to create company details")
