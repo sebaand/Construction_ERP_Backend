@@ -71,16 +71,14 @@ class InvoiceDownloadModel(BaseModel):
     status: str
     terms: str
     issue_date: datetime
-    quote_number: Optional[str] = Field(default="")
-    order_number: Optional[str] = Field(default="")
+    quote_number: str
     cis_reversal: bool
     invoiceTotal: float
     lineItems: List[LineItem]
     projectName: str
-    companyName: str
-    company_address: str
+    customer_name: str
+    customer_address: str
     site_address: str
-    invoice_address: str
     telephone: str
     vat_number: str
     company_number: str
@@ -88,3 +86,8 @@ class InvoiceDownloadModel(BaseModel):
     bank_address: str
     sort_code: str
     account_number: str
+    companyName: str
+    companyAddress: str  
+    companyVat: str
+    companyEmail: str
+    companyTelephone: str
