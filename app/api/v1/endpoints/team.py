@@ -31,3 +31,12 @@ async def update_existing_user(
     team_service: Team_Service = Depends(get_team_service)
 ):
     return await team_service.update_existing_user(user_fields)
+
+
+@router.delete("/delete-users/")
+async def remove_team_users(
+    premiumKey: str = Query(...),
+    users: list = Body(...),
+    team_service: Team_Service = Depends(get_team_service)
+):
+    return await team_service.remove_team_users(users, premiumKey)

@@ -1,86 +1,3 @@
-# app/services/team_service.py
-# from motor.motor_asyncio import AsyncIOMotorClient
-# from bson import ObjectId
-# from fastapi import HTTPException
-# from typing import List, Dict, Optional
-# from app.schemas.user import PlatformUsers
-
-# class Team_Service:
-#     def __init__(self, client: AsyncIOMotorClient):
-#         self.db = client.Forms
-#         self.platform_users = self.db.get_collection("Users")
-
-#     # Route for adding users to project team
-#     async def add_user(self, user_fields: dict, email: str):
-#         # Retrieve the admin user based on the provided email
-#         admin = await self.platform_users.find_one({"email": email})
-#         user = await self.platform_users.find_one({"email": user_fields["email"]})
-#         print(user_fields)
-
-#         if not admin:
-#             raise HTTPException(status_code=404, detail="Admin user not found")
-
-#         try:
-#             if user:
-#                 print(1)
-#                 # Update the user's profile fields
-#                 organization = user.get("organization", admin["organization"])
-#                 database_id = user.get("database_id")
-#                 auth0_id = user.get("auth0_id")
-
-#                 # Check if the user already has an organization_id array
-#                 if user.get("organization_id"):
-#                     # Append the new value pair to the existing organization_id array
-#                     organization_id = user["organization_id"]
-#                     # Update the subscription tier for the existing key
-#                     for item in organization_id:
-#                         key = list(item.keys())[0]
-#                         if key == list(admin["organization_id"][0].keys())[0]:
-#                             item[key] = user_fields["organization_id"]
-#                             break
-#                 else:
-#                     # Create a new organization_id array with the value pair using the admin's key
-#                     admin_key = list(admin["organization_id"][0].keys())[0]
-#                     organization_id = [{admin_key: user_fields["organization_id"]}]
-
-#                 new_user = {
-#                     "name": user_fields["name"],
-#                     "email": user_fields["email"],
-#                     "organization": organization,
-#                     "organization_id": organization_id,
-#                     "database_id": database_id,
-#                     "auth0_id": auth0_id
-#                 }
-#                 # Update the user in the database
-#                 await self.platform_users.update_one({"email": user_fields["email"]}, {"$set": new_user})
-#                 return {"message": "User updated successfully"}
-#             else:
-#                 # Get the key from the admin's organization_id
-#                 admin_key = list(admin["organization_id"][0].keys())[0]
-#                 print(admin_key)
-                
-#                 # Convert organization_id to a list of dictionaries
-#                 organization_id = [{admin_key: user_fields["organization_id"]}]
-#                 organization_id = [
-#                     {key: str(value[0]) if isinstance(value, list) else str(value)}
-#                     for org_id in organization_id
-#                     for key, value in org_id.items()
-#                 ]
-                
-#                 new_user = {
-#                     "name": user_fields["name"],
-#                     "email": user_fields["email"],
-#                     "organization": admin["organization"],
-#                     "organization_id": organization_id,
-#                     "database_id": None,
-#                     "auth0_id": None
-#                 }
-#                 # Insert the new user into the database
-#                 await self.platform_users.insert_one(new_user)
-#                 return {"message": "User added successfully"}
-#         except Exception as e:
-#             raise HTTPException(status_code=500, detail=str(e))
-
 from motor.motor_asyncio import AsyncIOMotorClient
 from fastapi import HTTPException
 from typing import List, Dict, Optional
@@ -232,4 +149,43 @@ class Team_Service:
             raise HTTPException(
                 status_code=500,
                 detail=f"Error processing user: {str(e)}"
+            )
+        
+
+    async def remove_team_users(self, users: List[str], premiumKey: str):
+        try:
+            updated_users = []
+            for email in users:
+                # Find the user by email
+                user = await self.platform_users.find_one({"email": email})
+                
+                if user:
+                    # Filter out the object that has premiumKey as its key
+                    updated_org_ids = [
+                        org for org in user.get("organization_id", [])
+                        if premiumKey not in org  # This checks if premiumKey is not a key in the dictionary
+                    ]
+                    
+                    # Update the user document with filtered organization_ids
+                    result = await self.platform_users.update_one(
+                        {"_id": user["_id"]},
+                        {"$set": {"organization_id": updated_org_ids}}
+                    )
+                    
+                    if result.modified_count > 0:
+                        updated_users.append(email)
+            
+            if not updated_users:
+                return {"message": "No users were found or updated"}
+            
+            return {
+                "message": "Users removed from the team successfully",
+                "updated_users": updated_users
+            }
+            
+        except Exception as e:
+            logging.error(f"Error removing team users: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error removing users from team: {str(e)}"
             )
