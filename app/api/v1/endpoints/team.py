@@ -4,7 +4,8 @@ from bson import ObjectId
 from app.schemas.user import PlatformUsers
 from app.schemas.collections import UsersCollection
 from app.services.mongodb_service import MongoDB_Service
-from app.api.deps import get_mongodb_service
+from app.services.team_service import Team_Service
+from app.api.deps import get_mongodb_service, get_team_service
 
 router = APIRouter()
 
@@ -15,26 +16,18 @@ async def list_team_users(
 ):
     return await mongodb_service.list_team_users(owner)
 
-@router.put("/{email}")
+@router.put("/add-user/")
 async def add_user(
-    email: str,
+    email: str = Query(...),
     user_fields: dict = Body(...),
-    mongodb_service: MongoDB_Service = Depends(get_mongodb_service)
+    team_service: Team_Service = Depends(get_team_service)
 ):
-    return await mongodb_service.add_user(email, user_fields)
+    return await team_service.add_user(email, user_fields)
 
-@router.put("/update/{email}")
-async def update_team_users(
-    email: str,
-    updated_fields: dict = Body(...),
-    mongodb_service: MongoDB_Service = Depends(get_mongodb_service)
-):
-    return await mongodb_service.update_team_user(email, updated_fields)
 
-@router.post("/delete/{premium_key}")
-async def remove_team_users(
-    premium_key: str,
-    database_ids: List[str] = Body(...),
-    mongodb_service: MongoDB_Service = Depends(get_mongodb_service)
+@router.put("/update-team-users/")
+async def update_existing_user(
+    user_fields: dict = Body(...),
+    team_service: Team_Service = Depends(get_team_service)
 ):
-    return await mongodb_service.remove_team_users(database_ids, premium_key)
+    return await team_service.update_existing_user(user_fields)

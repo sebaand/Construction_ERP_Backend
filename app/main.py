@@ -9,6 +9,7 @@ app = FastAPI(title="SiteSteer API")
 logging.getLogger("pymongo").setLevel(logging.WARNING)
 logging.getLogger("motor").setLevel(logging.WARNING)
 
+
 # CORS middleware setup
 app.add_middleware(
     CORSMiddleware,

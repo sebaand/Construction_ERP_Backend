@@ -1,5 +1,6 @@
 from fastapi import Depends
 from motor.motor_asyncio import AsyncIOMotorClient
+from app.services.team_service import Team_Service
 from app.services.mongodb_service import MongoDB_Service
 from app.services.slates_service import Slates_Service
 from app.services.project_service import Project_Service
@@ -23,6 +24,9 @@ async def get_mongodb_client():
 
 def get_company_service(client: AsyncIOMotorClient = Depends(get_mongodb_client)):
     return Company_Service(client)
+
+def get_team_service(client: AsyncIOMotorClient = Depends(get_mongodb_client)):
+    return Team_Service(client)
 
 def get_mongodb_service(client: AsyncIOMotorClient = Depends(get_mongodb_client)):
     return MongoDB_Service(client)

@@ -66,7 +66,6 @@ class MongoDB_Service:
         users = await self.platform_users.find(query).to_list(None)
         
         for user in users:
-            user["database_id"] = str(user["_id"])
             user["organization_id"] = self._format_org_ids(user["organization_id"])
             user["auth0_id"] = str(user["auth0_id"]) if user["auth0_id"] else ""
 
@@ -86,18 +85,6 @@ class MongoDB_Service:
             for key, value in org_id.items()
         ]
 
-    async def add_user(self, admin_email: str, user_fields: Dict):
-        admin = await self.platform_users.find_one({"email": admin_email})
-        if not admin:
-            raise HTTPException(status_code=404, detail="Admin user not found")
-
-        user = await self.platform_users.find_one({"email": user_fields["email"]})
-        
-        if user:
-            return await self._update_existing_user(user, admin, user_fields)
-        else:
-            return await self._create_new_user(admin, user_fields)
-
     async def _update_existing_user(self, user, admin, user_fields):
         organization = user.get("organization", admin["organization"])
         organization_id = user.get("organization_id", [])
@@ -115,7 +102,6 @@ class MongoDB_Service:
             "email": user_fields["email"],
             "organization": organization,
             "organization_id": organization_id,
-            "database_id": user.get("database_id"),
             "auth0_id": user.get("auth0_id")
         }
         

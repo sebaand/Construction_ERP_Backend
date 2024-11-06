@@ -1,5 +1,4 @@
 # app/services/user_service.py
-
 from motor.motor_asyncio import AsyncIOMotorClient
 from bson import ObjectId
 from fastapi import HTTPException

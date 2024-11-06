@@ -94,11 +94,11 @@ class Invoice_Service:
         )
 
         if result.modified_count == 0:
-            raise HTTPException(status_code=404, detail="Quote not found or already archived")
+            raise HTTPException(status_code=404, detail="Invoice not found or already archived")
 
         # Fetch and return the updated document
         updated_doc = await self.invoice_details.find_one({"owner_org": owner})
         if not updated_doc:
             raise HTTPException(status_code=404, detail="Updated document not found")
         
-        return InvoiceSlateModel(**updated_doc)
+        return Invoice_Complete_Data(**updated_doc)
