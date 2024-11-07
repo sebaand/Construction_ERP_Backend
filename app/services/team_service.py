@@ -10,6 +10,38 @@ class Team_Service:
         self.db = client.Forms
         self.platform_users = self.db.get_collection("Users")
 
+    async def list_team_users(self, owner: str):
+        org_admin = await self.platform_users.find_one({"email": owner})
+        if not org_admin:
+            return {"users": [], "premium_key": None}
+
+        premium_org_id = self._find_premium_org_id(org_admin["organization_id"])
+        if not premium_org_id:
+            return {"users": [], "premium_key": None}
+
+        query = {"organization_id": {"$elemMatch": {premium_org_id: {"$exists": True}}}}
+        users = await self.platform_users.find(query).to_list(None)
+        
+        for user in users:
+            user["organization_id"] = self._format_org_ids(user["organization_id"])
+            user["auth0_id"] = str(user["auth0_id"]) if user["auth0_id"] else ""
+
+        return {"users": users, "premium_key": premium_org_id}
+
+    def _find_premium_org_id(self, org_ids):
+        for org_id_dict in org_ids:
+            for key, value in org_id_dict.items():
+                if value == "Premium User":
+                    return key
+        return None
+
+    def _format_org_ids(self, org_ids):
+        return [
+            {key: str(value[0]) if isinstance(value, list) else str(value)}
+            for org_id in org_ids
+            for key, value in org_id.items()
+        ]
+
     async def add_user(self, admin_email: str, user_fields: dict) -> dict:
         """
         Add or update a user in the platform with organization details inherited from admin.
