@@ -80,7 +80,7 @@ async def prospect_list(
     return await prospect_service.prospect_list(owner)
 
 
-@router.post("/prospect-details/", response_model=Prospect_Data)
+@router.post("/prospect-details/", response_model=MergedProspectData)
 async def update_prospect_data(
     owner: str = Query(...),
     prospect_data: Prospect_Data = Body(...),
@@ -97,6 +97,24 @@ async def archive_prospect(
 ):
     try:
         return await prospect_service.archive_prospect(owner, projectId)
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
+
+
+@router.post("/delete/")
+async def delete_prospect(
+    owner: str = Query(...),
+    projectId: str = Query(...),
+    prospect_service: Prospect_Service = Depends(get_prospect_service)
+):
+    try:
+        deleted_items = await prospect_service.delete_prospect(owner, projectId)
+        return {
+            "message": "Prospect and related items deleted successfully",
+            "deleted_items": deleted_items
+        }
     except HTTPException as e:
         raise e
     except Exception as e:

@@ -132,3 +132,21 @@ async def archive_invoice(
         raise e
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
+    
+
+@router.post("/delete/")
+async def delete_invoice(
+    owner: str = Query(...),
+    invoiceId: str = Query(...),
+    invoice_service: Invoice_Service = Depends(get_invoice_service)
+):
+    try:
+        deleted_items = await invoice_service.delete_invoice(owner, invoiceId)
+        return {
+            "message": "Invoice deleted successfully",
+            "deleted_items": deleted_items
+        }
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")

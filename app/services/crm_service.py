@@ -11,6 +11,9 @@ class CRM_Service:
     def __init__(self, client: AsyncIOMotorClient):
         self.db = client.Forms
         self.crm_details = self.db.get_collection("CRM")
+        self.prospect_details = self.db.get_collection("Prospects")
+        self.quote_details = self.db.get_collection("Quotes")
+        self.invoice_details = self.db.get_collection("Invoices")
 
     async def get_crm_data(self, owner: str) -> CRM_Data:
         crm_data = await self.crm_details.find_one({"owner_org": owner})
@@ -83,3 +86,66 @@ class CRM_Service:
             raise HTTPException(status_code=422, detail=e.errors())
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
+ 
+
+    # Service to delete customer and all related dependencies
+    async def delete_customer(self, owner: str, companyId: str) -> dict:
+        """
+        Delete a customer and all related records across collections.
+        Returns a dictionary with counts of deleted items from each collection.
+        """
+        try:
+            # Dictionary to track deletion results
+            deletion_results = {
+                "crm": 0,
+                "prospects": 0,
+                "quotes": 0,
+                "invoices": 0
+            }
+
+            # Delete from CRM
+            result_crm = await self.crm_details.update_one(
+                {"owner_org": owner},
+                {
+                    "$pull": {
+                        "items": {
+                            "companyId": companyId
+                        }
+                    }
+                }
+            )
+            
+            if result_crm.modified_count == 0:
+                raise HTTPException(status_code=404, detail="Customer not found")
+            
+            deletion_results["crm"] = result_crm.modified_count
+
+            # Delete related records from other collections
+            collections = [
+                (self.prospect_details, "prospects"),
+                (self.quote_details, "quotes"),
+                (self.invoice_details, "invoices")
+            ]
+
+            for collection, key in collections:
+                result = await collection.update_one(
+                    {"owner_org": owner},
+                    {
+                        "$pull": {
+                            "items": {
+                                "companyId": companyId
+                            }
+                        }
+                    }
+                )
+                deletion_results[key] = result.modified_count
+            print('deletion_results', deletion_results)
+            return deletion_results
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error deleting customer and related items: {str(e)}"
+            )

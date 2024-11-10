@@ -97,6 +97,7 @@ async def get_merged_quote_data(owner: str, quoteId: str, company_service: Compa
 
 # # # # # # # All POST Routes # # # # # # # # # #
 # # # # # # # # # # # # # # # # # # # # # # # # #
+    
 # Route for posting adding or updating all quotes associated with an owner_org
 @router.post("/quote-details/", response_model=Quote_Complete_Data)
 async def update_quote_data(
@@ -105,6 +106,24 @@ async def update_quote_data(
     quote_service: Quote_Service = Depends(get_quote_service)
 ):
     return await quote_service.update_quote_data(owner, quote_data)
+
+# Route for deleting a specific quoteId
+@router.post("/delete/")
+async def delete_quote(
+    owner: str = Query(...),
+    quoteId: str = Query(...),
+    quote_service: Quote_Service = Depends(get_quote_service)
+):
+    try:
+        deleted_items = await quote_service.delete_quote(owner, quoteId)
+        return {
+            "message": "Quote and related items deleted successfully",
+            "deleted_items": deleted_items
+        }
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
 
 # Route for archiving a specific quoteId
 @router.post("/archive/")
@@ -119,4 +138,6 @@ async def archive_quote(
         raise e
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
+    
+
     

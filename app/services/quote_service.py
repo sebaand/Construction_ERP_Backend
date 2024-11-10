@@ -14,6 +14,7 @@ class Quote_Service:
     def __init__(self, client: AsyncIOMotorClient):
         self.db = client.Forms
         self.quote_details = self.db.get_collection("Quotes")
+        self.invoice_details = self.db.get_collection("Invoices")
         self.prospect_service = Prospect_Service(client)  # Initialize Prospect_Service
         self.crm_service = CRM_Service(client)  # Initialize CRM_Service
 
@@ -100,3 +101,63 @@ class Quote_Service:
             raise HTTPException(status_code=404, detail="Updated document not found")
         
         return Quote_Data(**updated_doc)
+    
+
+    # Service to delete prospect and all related dependencies
+    async def delete_quote(self, owner: str, quoteId: str) -> dict:
+        """
+        Delete a customer and all related records across collections.
+        Returns a dictionary with counts of deleted items from each collection.
+        """
+        try:
+            # Dictionary to track deletion results
+            deletion_results = {
+                "quotes": 0,
+                "invoices": 0
+            }
+
+            # Delete from CRM
+            result_quotes = await self.quote_details.update_one(
+                {"owner_org": owner},
+                {
+                    "$pull": {
+                        "items": {
+                            "quoteId": quoteId
+                        }
+                    }
+                }
+            )
+            
+            if result_quotes.modified_count == 0:
+                raise HTTPException(status_code=404, detail="Quote not found")
+            
+            deletion_results["quotes"] = result_quotes.modified_count
+
+            # Delete related records from other collections
+            collections = [
+                (self.quote_details, "quotes"),
+                (self.invoice_details, "invoices")
+            ]
+
+            for collection, key in collections:
+                result = await collection.update_one(
+                    {"owner_org": owner},
+                    {
+                        "$pull": {
+                            "items": {
+                                "quoteId": quoteId
+                            }
+                        }
+                    }
+                )
+                deletion_results[key] = result.modified_count
+            print('deletion_results', deletion_results)
+            return deletion_results
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error deleting quotes and related items: {str(e)}"
+            )

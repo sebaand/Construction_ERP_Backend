@@ -102,3 +102,42 @@ class Invoice_Service:
             raise HTTPException(status_code=404, detail="Updated document not found")
         
         return Invoice_Complete_Data(**updated_doc)
+    
+
+    # Service to delete prospect and all related dependencies
+    async def delete_invoice(self, owner: str, invoiceId: str) -> dict:
+        """
+        Delete a customer and all related records across collections.
+        Returns a dictionary with counts of deleted items from each collection.
+        """
+        try:
+            # Dictionary to track deletion results
+            deletion_results = {
+                "invoices": 0
+            }
+
+            # Delete from CRM
+            result_invoices = await self.invoice_details.update_one(
+                {"owner_org": owner},
+                {
+                    "$pull": {
+                        "items": {
+                            "invoiceId": invoiceId
+                        }
+                    }
+                }
+            )
+            
+            if result_invoices.modified_count == 0:
+                raise HTTPException(status_code=404, detail="Invoice not found")
+            
+            deletion_results["invoices"] = result_invoices.modified_count
+            return deletion_results
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error deleting invoice: {str(e)}"
+            )

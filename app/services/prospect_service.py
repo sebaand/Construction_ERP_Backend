@@ -14,6 +14,8 @@ class Prospect_Service:
         self.db = client.Forms
         self.prospect_details = self.db.get_collection("Prospects")
         self.crm_details = self.db.get_collection("CRM")
+        self.quote_details = self.db.get_collection("Quotes")
+        self.invoice_details = self.db.get_collection("Invoices")
         self.crm_service = CRM_Service(client)
 
 
@@ -65,17 +67,17 @@ class Prospect_Service:
             items=merged_items
         )
 
-    async def update_prospect_data(self, owner: str, Prospects: Prospect_Data) -> Prospect_Data:
+    # Function to update a prospect  
+    async def update_prospect_data(self, owner: str, Prospects: Prospect_Data) -> MergedProspectData:
         try:
             # Ensure the owner_org matches the one from the URL
             Prospects.owner_org = owner
 
+            # Process items and generate new IDs where needed
             updated_items = []
             for item in Prospects.items:
                 if not item.projectId:
-                    # Generate a new companyId for new prospect (empty string)
                     item.projectId = str(uuid4())
-                # If companyId is not empty, it's an existing prospect, so we keep the id
                 updated_items.append(item)
 
             validated_data = Prospect_Data(
@@ -85,8 +87,8 @@ class Prospect_Service:
 
             update_data = validated_data.model_dump()
 
+            # Update or insert the data
             existing_entry = await self.prospect_details.find_one({"owner_org": owner})
-
             if existing_entry:
                 result = await self.prospect_details.replace_one(
                     {"owner_org": owner},
@@ -99,7 +101,10 @@ class Prospect_Service:
                 if not result.inserted_id:
                     raise HTTPException(status_code=400, detail="Failed to create prospect details")
 
-            return validated_data
+            # After successful update, return merged data
+            merged_data = await self.merge_prospect_data(owner)
+            return merged_data
+
         except ValidationError as e:
             raise HTTPException(status_code=422, detail=e.errors())
         except Exception as e:
@@ -155,7 +160,8 @@ class Prospect_Service:
                 owner_org=owner,
                 prospects=[]
             )
-        
+
+    # Function to archive a prospect   
     async def archive_prospect(self, owner: str, projectId: str) -> None:
         result = await self.prospect_details.update_one(
             {"owner_org": owner, "items.projectId": projectId},
@@ -171,3 +177,65 @@ class Prospect_Service:
             raise HTTPException(status_code=404, detail="Updated document not found")
 
         return Prospect_Data(**updated_doc)
+    
+
+    # Service to delete prospect and all related dependencies
+    async def delete_prospect(self, owner: str, projectId: str) -> dict:
+        """
+        Delete a customer and all related records across collections.
+        Returns a dictionary with counts of deleted items from each collection.
+        """
+        try:
+            # Dictionary to track deletion results
+            deletion_results = {
+                "prospects": 0,
+                "quotes": 0,
+                "invoices": 0
+            }
+
+            # Delete from CRM
+            result_prospects = await self.prospect_details.update_one(
+                {"owner_org": owner},
+                {
+                    "$pull": {
+                        "items": {
+                            "projectId": projectId
+                        }
+                    }
+                }
+            )
+            
+            if result_prospects.modified_count == 0:
+                raise HTTPException(status_code=404, detail="Prospect not found")
+            
+            deletion_results["prospects"] = result_prospects.modified_count
+
+            # Delete related records from other collections
+            collections = [
+                (self.prospect_details, "prospects"),
+                (self.quote_details, "quotes"),
+                (self.invoice_details, "invoices")
+            ]
+
+            for collection, key in collections:
+                result = await collection.update_one(
+                    {"owner_org": owner},
+                    {
+                        "$pull": {
+                            "items": {
+                                "projectId": projectId
+                            }
+                        }
+                    }
+                )
+                deletion_results[key] = result.modified_count
+            print('deletion_results', deletion_results)
+            return deletion_results
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error deleting prospect and related items: {str(e)}"
+            )
