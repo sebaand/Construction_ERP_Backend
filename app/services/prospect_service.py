@@ -33,7 +33,7 @@ class Prospect_Service:
             )
         
 
-    async def merge_prospect_data(self, owner: str) -> MergedProspectData:
+    async def get_merged_prospect_data(self, owner: str) -> MergedProspectData:
         prospects = await self.get_prospect_data(owner)
         customers = await self.crm_service.customer_list(owner)  # Assuming you have access to crm_service
 
@@ -60,6 +60,44 @@ class Prospect_Service:
                 telephone=lookups['telephone'].get(prospect.companyId, "Unknown"),
             )
             for prospect in prospects.items
+        ]
+
+        return MergedProspectData(
+            owner_org=owner,
+            items=merged_items
+        )
+    
+    async def get_active_merged_prospect_data(self, owner: str) -> MergedProspectData:
+        # Get all prospects first
+        prospects = await self.get_prospect_data(owner)
+        customers = await self.crm_service.customer_list(owner)
+
+        # Filter out archived prospects
+        active_prospects = [prospect for prospect in prospects.items if prospect.status != "Archived"]
+
+        # Create lookup dictionaries
+        lookups = {
+            'customer_name': {c.companyId: c.customer_name for c in customers.customers},
+            'customer_address': {c.companyId: c.customer_address for c in customers.customers},
+            'vat_number': {c.companyId: c.vat_number for c in customers.customers},
+            'company_number': {c.companyId: c.company_number for c in customers.customers},
+            'telephone': {c.companyId: c.telephone for c in customers.customers}
+        }
+
+        merged_items = [
+            MergedProspect(
+                companyId=prospect.companyId,
+                projectId=prospect.projectId,
+                projectName=prospect.projectName,
+                site_address=prospect.site_address,
+                status=prospect.status,
+                companyName=lookups['customer_name'].get(prospect.companyId, "Unknown"),
+                company_address=lookups['customer_address'].get(prospect.companyId, "Unknown"),
+                company_number=lookups['company_number'].get(prospect.companyId, "Unknown"),
+                vat_number=lookups['vat_number'].get(prospect.companyId, "Unknown"),
+                telephone=lookups['telephone'].get(prospect.companyId, "Unknown"),
+            )
+            for prospect in active_prospects  # Use the filtered prospects here
         ]
 
         return MergedProspectData(

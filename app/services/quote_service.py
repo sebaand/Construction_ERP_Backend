@@ -9,6 +9,8 @@ from app.services.prospect_service import Prospect_Service
 from app.services.crm_service import CRM_Service
 from uuid import uuid4
 from datetime import datetime
+from typing import Optional, List
+from enum import Enum
 
 class Quote_Service:
     def __init__(self, client: AsyncIOMotorClient):
@@ -32,6 +34,43 @@ class Quote_Service:
                 owner_org=owner,
                 items=[]
             )
+        
+    class QuoteStatus(Enum):
+        ARCHIVED = "Archived"
+        CREATED = "Created"
+        ISSUED = "ISSUED"
+        APPROVED = "Approved"
+        # Add other statuses as needed
+
+    async def get_active_quote_data(
+        self, 
+        owner: str,
+        exclude_statuses: Optional[List[str]] = None
+    ) -> Quote_Complete_Data:
+        """
+        Get quotes for an owner, excluding specified statuses.
+        
+        Args:
+            owner: The owner organization ID
+            exclude_statuses: List of status values to exclude. Defaults to ["Archived"]
+        """
+        # Get all quotes
+        quotes = await self.get_quote_data(owner)
+        
+        # Default to excluding archived if no statuses specified
+        if exclude_statuses is None:
+            exclude_statuses = ["Archived"]
+
+        # Filter out quotes with excluded statuses
+        filtered_quotes = [
+            quote for quote in quotes.items 
+            if quote.status not in exclude_statuses
+        ]
+
+        return Quote_Complete_Data(
+            owner_org=owner,
+            items=filtered_quotes
+        )
 
     # service function for returning a single quote associated to an owner_org
     async def get_single_quote_data(self, owner: str, quoteId: str) -> QuoteSlateModel:

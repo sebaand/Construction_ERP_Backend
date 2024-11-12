@@ -8,6 +8,7 @@ from app.services.company_service import Company_Service
 from app.utils.generate_pdf import generate_quote_pdf
 from app.api.deps import get_quote_service, get_prospect_service, get_company_service
 import logging
+from typing import Optional, List
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -22,6 +23,17 @@ async def get_quote_data(
     quote_service: Quote_Service = Depends(get_quote_service)
 ):
     return await quote_service.get_quote_data(owner)
+
+@router.get("/active-quote-details/", response_model=Quote_Complete_Data)
+async def get_active_quote_data(
+    owner: str = Query(...),
+    exclude_statuses: Optional[List[str]] = Query(None),
+    quote_service: Quote_Service = Depends(get_quote_service)
+):
+    return await quote_service.get_active_quote_data(
+        owner, 
+        exclude_statuses=exclude_statuses
+    )
 
 # Collect data for a single quote
 @router.get("/single-quote-details/", response_model=QuoteSlateModel)

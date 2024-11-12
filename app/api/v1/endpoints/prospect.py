@@ -22,47 +22,23 @@ async def get_merged_prospect_data(
     prospect_service: Prospect_Service = Depends(get_prospect_service)
 ):
     """Endpoint that handles the HTTP request"""
-    return await prospect_service.merge_prospect_data(owner)
-
+    return await prospect_service.get_merged_prospect_data(owner)
 
 @router.get("/merged-prospect-data/", response_model=MergedProspectData)
 async def get_merged_prospect_data(
     owner: str = Query(...),
-    prospect_service: Prospect_Service = Depends(get_prospect_service),
-    crm_service: CRM_Service = Depends(get_crm_service)
+    prospect_service: Prospect_Service = Depends(get_prospect_service)
 ):
-    prospects = await prospect_service.get_prospect_data(owner)
-    customers = await crm_service.customer_list(owner)
+    """Endpoint that handles the HTTP request"""
+    return await prospect_service.get_merged_prospect_data(owner)
 
-    # Create a lookup dictionary for info from CRM
-    company_lookup = {customer.companyId: customer.customer_name for customer in customers.customers}
-    company_address_lookup = {customer.companyId: customer.customer_address for customer in customers.customers}
-    company_vat_lookup = {customer.companyId: customer.vat_number for customer in customers.customers}
-    company_nm_lookup = {customer.companyId: customer.company_number for customer in customers.customers}
-    telephone_lookup = {customer.companyId: customer.telephone for customer in customers.customers}
-
-    merged_items = [
-        MergedProspect(
-            companyId=prospect.companyId,
-            projectId=prospect.projectId,
-            projectName=prospect.projectName,
-            site_address=prospect.site_address,
-            status=prospect.status,
-            companyName=company_lookup.get(prospect.companyId, "Unknown"),
-            company_address=company_address_lookup.get(prospect.companyId, "Unknown"),
-            company_number=company_nm_lookup.get(prospect.companyId, "Unknown"),
-            vat_number=company_vat_lookup.get(prospect.companyId, "Unknown"),
-            telephone=telephone_lookup.get(prospect.companyId, "Unknown"),
-            # Add other fields as needed
-        )
-        for prospect in prospects.items
-    ]
-
-    return MergedProspectData(
-        owner_org=owner,
-        items=merged_items
-    )
-
+@router.get("/active-merged-prospect-data/", response_model=MergedProspectData)
+async def get_active_merged_prospect_data(
+    owner: str = Query(...),
+    prospect_service: Prospect_Service = Depends(get_prospect_service)
+):
+    """Endpoint that handles the HTTP request"""
+    return await prospect_service.get_active_merged_prospect_data(owner)
 
 @router.get("/customer-list/", response_model=CustomerNamesList)
 async def customer_list(
