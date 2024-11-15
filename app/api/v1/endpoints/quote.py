@@ -83,7 +83,7 @@ async def get_merged_quote_data(owner: str, quoteId: str, company_service: Compa
     """Internal helper function"""
     try:
         quote = await quote_service.get_single_quote_data(owner, quoteId)
-        merged_data = await prospect_service.merge_prospect_data(owner)
+        merged_data = await prospect_service.get_merged_prospect_data(owner)
         company_details = await company_service.get_company_details(owner)
     
         

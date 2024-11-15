@@ -77,7 +77,7 @@ async def get_merged_invoice_data(owner: str, invoiceId: str, company_service: C
     try:
         company_details = await company_service.get_company_details(owner)
         payment_data = await company_service.get_payment_details(owner)
-        merged_data = await prospect_service.merge_prospect_data(owner)
+        merged_data = await prospect_service.get_merged_prospect_data(owner)
         invoice = await invoice_service.get_single_invoice_data(owner, invoiceId)
         quote = await quote_service.get_single_quote_data(owner, invoice.quoteId)
         
