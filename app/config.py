@@ -25,6 +25,15 @@ class Settings(BaseSettings):
     DO_SECRET_KEY: str
     DO_ENDPOINT_URL: str
 
+    AUTH0_ACTION_API_KEY: str
+    SMTP_HOST: str
+    SMTP_PORT: int
+    SMTP_USERNAME: str
+    SMTP_PASSWORD: str
+    SMTP_FROM_EMAIL: str
+    ADMIN_EMAIL: str
+    SECOND_ADMIN_EMAIL: str
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
 settings = Settings()

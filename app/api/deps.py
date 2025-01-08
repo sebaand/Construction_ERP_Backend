@@ -12,6 +12,7 @@ from app.services.crm_service import CRM_Service
 from app.services.prospect_service import Prospect_Service
 from app.services.quote_service import Quote_Service
 from app.services.file_service import File_Service
+from app.services.email_service import Email_Service
 from app.config import settings
 
 
@@ -60,3 +61,7 @@ def get_quote_service(client: AsyncIOMotorClient = Depends(get_mongodb_client)):
 
 def get_file_service():
     return File_Service()
+
+
+def get_email_service():
+    return Email_Service()
