@@ -40,11 +40,10 @@ async def update_user_profile(
 
 @router.post("/register")
 async def register_user(
-    request: Request,
+    user_data: dict = Body(...),
     user_service: User_Service = Depends(get_user_service)
 ):
-    user_profile = await request.json()
-    return await user_service.register_user(user_profile)
+    return await user_service.register_user(user_data)
 
 @router.post("/login/")
 async def login_user(

@@ -14,7 +14,7 @@ logging.getLogger("motor").setLevel(logging.WARNING)
 # CORS middleware setup
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://www.sitesteer.ai", "https://localhost:3000", f"https://{settings.AUTH0_DOMAIN}"],  # Allow your frontend origin
+    allow_origins=["https://www.sitesteer.ai", "https://localhost:3000"],  # Allow your frontend origin
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

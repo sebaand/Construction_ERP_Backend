@@ -60,7 +60,7 @@ class Invoice_Service:
             for item in invoices.items:
                 if not item.invoiceId:
                     item.invoiceId = str(uuid4())
-                item.last_updated = datetime.utcnow()
+                item.last_updated = datetime.timezone.utc()
                 updated_items.append(item)
 
             validated_data = Invoice_Complete_Data(

@@ -6,6 +6,7 @@ from typing import List, Dict, Optional
 from app.schemas.user import PlatformUsers, UserData
 from app.schemas.early_bird import EarlyBird
 from app.schemas.collections import UsersCollection
+from uuid import uuid4
 
 class User_Service:
     def __init__(self, client: AsyncIOMotorClient):
@@ -67,7 +68,7 @@ class User_Service:
             'database_id': None,
             "name": None,
             "organization": None,
-            "organization_id": [],
+            "organization_id": [ {str(uuid4()) : "Premium User"} ],
         }
         await self.platform_users.insert_one(new_user)
         return {"message": "User registered successfully"}
