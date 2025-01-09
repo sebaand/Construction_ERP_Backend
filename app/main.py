@@ -2,6 +2,7 @@ import logging
 from fastapi import FastAPI
 from app.api.v1.router import api_router
 from fastapi.middleware.cors import CORSMiddleware
+from app.config import settings
 
 app = FastAPI(title="SiteSteer API")
 
@@ -13,7 +14,7 @@ logging.getLogger("motor").setLevel(logging.WARNING)
 # CORS middleware setup
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://www.sitesteer.ai", "https://localhost:3000"],  # Allow your frontend origin
+    allow_origins=["https://www.sitesteer.ai", "https://localhost:3000", f"https://{settings.AUTH0_DOMAIN}"],  # Allow your frontend origin
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
