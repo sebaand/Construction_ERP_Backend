@@ -1,0 +1,30 @@
+{
+    "company_id": "123",
+    "steps": {
+      "crm": {
+        "step_name": "CRM",
+        "entity_schema_id": "crm_schema",
+        "required": true,
+        "next_steps": ["project", "quote"]
+      },
+      "project": {
+        "step_name": "Project",
+        "entity_schema_id": "project_schema",
+        "required": false,
+        "next_steps": ["quote", "invoice"]
+      },
+      "quote": {
+        "step_name": "Quote",
+        "entity_schema_id": "quote_schema",
+        "required": false,
+        "next_steps": ["invoice"]
+      },
+      "invoice": {
+        "step_name": "Invoice",
+        "entity_schema_id": "invoice_schema",
+        "required": true,
+        "next_steps": []
+      }
+    },
+    "initial_step": "crm"
+  }
